@@ -1,0 +1,549 @@
+import {afterEach, beforeAll, describe, expect, it, vi} from 'vitest';
+import {copyText, installUiBehaviours} from '../src/index.js';
+
+// The listeners sit on the document and outlive each test's markup: install once.
+beforeAll(() => {
+    installUiBehaviours();
+});
+
+afterEach(() => {
+    vi.useRealTimers();
+    document.body.innerHTML = '';
+});
+
+const refused = () => new DOMException('The request is not allowed');
+
+function submit(submitter) {
+    const event = new SubmitEvent('submit', {bubbles: true, cancelable: true, submitter});
+
+    document.querySelector('form').dispatchEvent(event);
+
+    return !event.defaultPrevented;
+}
+
+// happy-dom's pageshow carries no persisted flag.
+function showPage({persisted}) {
+    window.dispatchEvent(Object.assign(new Event('pageshow'), {persisted}));
+}
+
+function click(target, options = {}) {
+    const event = new MouseEvent('click', {bubbles: true, cancelable: true, ...options});
+
+    target.dispatchEvent(event);
+
+    return event;
+}
+
+describe('installUiBehaviours', () => {
+    it('adds no second set of listeners when called again', () => {
+        installUiBehaviours();
+        document.body.innerHTML = '<form data-confirm="Delete this ad?"><button>Delete</button></form>';
+        const ask = vi.fn(() => true);
+        vi.stubGlobal('confirm', ask);
+
+        submit(document.querySelector('button'));
+
+        expect(ask).toHaveBeenCalledTimes(1);
+    });
+});
+
+describe('data-confirm', () => {
+    it('asks the form\'s question for a button of its own, and only a yes submits', () => {
+        document.body.innerHTML = '<form data-confirm="Delete this ad?"><button>Delete</button></form>';
+        const button = document.querySelector('button');
+        const ask = vi.fn(() => false);
+        vi.stubGlobal('confirm', ask);
+
+        expect(submit(button)).toBe(false);
+        expect(ask).toHaveBeenCalledWith('Delete this ad?');
+
+        ask.mockReturnValue(true);
+        expect(submit(button)).toBe(true);
+    });
+
+    it('asks the pressed button\'s question when buttons share a form', () => {
+        document.body.innerHTML = `
+            <form>
+                <button formaction="/admin/withdrawals/5/approve" data-confirm="Approve withdrawal #5?">Approve</button>
+                <button formaction="/admin/withdrawals/5/complete" data-confirm="Complete withdrawal #5?">Complete</button>
+                <button formaction="/admin/withdrawals/5/return">Return</button>
+            </form>`;
+        const [approve, complete, unguarded] = document.querySelectorAll('button');
+        const ask = vi.fn(() => false);
+        vi.stubGlobal('confirm', ask);
+
+        expect(submit(complete)).toBe(false);
+        expect(ask).toHaveBeenLastCalledWith('Complete withdrawal #5?');
+
+        ask.mockReturnValue(true);
+        expect(submit(approve)).toBe(true);
+        expect(ask).toHaveBeenLastCalledWith('Approve withdrawal #5?');
+
+        ask.mockClear();
+        expect(submit(unguarded)).toBe(true);
+        expect(ask).not.toHaveBeenCalled();
+    });
+
+    it('does not ask about a submit the page already stopped', () => {
+        document.body.innerHTML = '<form data-confirm="Delete this ad?"><button>Delete</button></form>';
+        document.querySelector('form').addEventListener('submit', (event) => event.preventDefault());
+        const ask = vi.fn(() => true);
+        vi.stubGlobal('confirm', ask);
+
+        submit(document.querySelector('button'));
+
+        expect(ask).not.toHaveBeenCalled();
+    });
+});
+
+function change(box) {
+    box.dispatchEvent(new Event('change', {bubbles: true}));
+}
+
+function renderRows() {
+    document.body.innerHTML = `
+        <input type="checkbox" data-check-all="ids[]">
+        <input type="checkbox" name="ids[]">
+        <input type="checkbox" name="ids[]" checked>
+        <input type="checkbox" name="ids[]" disabled>
+        <input type="checkbox" name="exclude[]">`;
+
+    return {
+        all: document.querySelector('[data-check-all]'),
+        rows: [...document.querySelectorAll('input[name="ids[]"]:not([disabled])')],
+        locked: document.querySelector('input[disabled]'),
+        other: document.querySelector('input[name="exclude[]"]'),
+    };
+}
+
+describe('data-submit-once', () => {
+    it('sends the form once and marks it, keeping the pressed button\'s value', () => {
+        document.body.innerHTML = '<form data-submit-once><button name="gateway" value="balance">Pay</button></form>';
+        const button = document.querySelector('button');
+
+        expect(submit(button)).toBe(true);
+        expect(document.querySelector('form').hasAttribute('data-submitting')).toBe(true);
+        expect(button.disabled).toBe(false);
+        expect(submit(button)).toBe(false);
+    });
+
+    it('sends again once the page comes back from the back-forward cache, but not on a fresh show', () => {
+        document.body.innerHTML = '<form data-submit-once><button>Pay</button></form>';
+        const button = document.querySelector('button');
+        submit(button);
+
+        showPage({persisted: false});
+        expect(submit(button)).toBe(false);
+
+        showPage({persisted: true});
+        expect(submit(button)).toBe(true);
+    });
+
+    it('leaves a submit the confirm refused unsent, so the next one goes', () => {
+        document.body.innerHTML = '<form data-submit-once data-confirm="Cancel your plan?"><button>Cancel</button></form>';
+        const button = document.querySelector('button');
+        const ask = vi.fn(() => false);
+        vi.stubGlobal('confirm', ask);
+
+        expect(submit(button)).toBe(false);
+        ask.mockReturnValue(true);
+        expect(submit(button)).toBe(true);
+        expect(submit(button)).toBe(false);
+    });
+
+    it('lets a form without the attribute submit again', () => {
+        document.body.innerHTML = '<form><button>Search</button></form>';
+        const button = document.querySelector('button');
+
+        expect(submit(button)).toBe(true);
+        expect(submit(button)).toBe(true);
+    });
+});
+
+describe('data-check-all', () => {
+    it('ticks and unticks every row it names to match the header box, and nothing else', () => {
+        const {all, rows, locked, other} = renderRows();
+
+        all.checked = true;
+        change(all);
+        expect(rows.map((box) => box.checked)).toEqual([true, true]);
+        expect(locked.checked).toBe(false);
+        expect(other.checked).toBe(false);
+
+        all.checked = false;
+        change(all);
+        expect(rows.map((box) => box.checked)).toEqual([false, false]);
+    });
+
+    it('follows the rows: checked when all are, indeterminate when some are', () => {
+        const {all, rows} = renderRows();
+
+        change(rows[1]);
+        expect([all.checked, all.indeterminate]).toEqual([false, true]);
+
+        rows[0].checked = true;
+        change(rows[0]);
+        expect([all.checked, all.indeterminate]).toEqual([true, false]);
+
+        rows[0].checked = false;
+        rows[1].checked = false;
+        change(rows[1]);
+        expect([all.checked, all.indeterminate]).toEqual([false, false]);
+    });
+
+    it('leaves the header alone when another group changes', () => {
+        const {all, other} = renderRows();
+
+        other.checked = true;
+        change(other);
+
+        expect([all.checked, all.indeterminate]).toEqual([false, false]);
+    });
+});
+
+describe('data-autoselect', () => {
+    it('selects the whole value of an input or a textarea on a click', () => {
+        document.body.innerHTML = `
+            <input type="text" value="https://exe.io/abcd" readonly data-autoselect>
+            <textarea readonly data-autoselect>https://exe.io/a</textarea>`;
+
+        for (const field of document.querySelectorAll('[data-autoselect]')) {
+            field.click();
+
+            expect([field.selectionStart, field.selectionEnd]).toEqual([0, field.value.length]);
+        }
+    });
+});
+
+function renderCopyField() {
+    vi.useFakeTimers();
+    document.body.innerHTML = `
+        <input id="copy-1" type="text" value="https://exe.io/abcd" readonly data-autoselect>
+        <button type="button" data-copy="copy-1"><span>Copy</span><span>Copied</span></button>`;
+
+    return {
+        input: document.querySelector('input'),
+        button: document.querySelector('button'),
+    };
+}
+
+/** Clicks a copy button and lets the clipboard answer. */
+async function copyWith(button) {
+    button.click();
+    await vi.advanceTimersByTimeAsync(0);
+}
+
+describe('data-copy', () => {
+    it('marks the button copied for 1.5 seconds, and a second copy restarts them', async () => {
+        const {button} = renderCopyField();
+        const write = vi.spyOn(navigator.clipboard, 'writeText').mockResolvedValue(undefined);
+
+        // Clicked on the label, as a mouse does, not on the button itself.
+        await copyWith(button.querySelector('span'));
+        expect(write).toHaveBeenCalledWith('https://exe.io/abcd');
+        expect(button.hasAttribute('data-copied')).toBe(true);
+
+        await vi.advanceTimersByTimeAsync(1_000);
+        button.click();
+        await vi.advanceTimersByTimeAsync(1_000);
+        expect(button.hasAttribute('data-copied')).toBe(true);
+
+        await vi.advanceTimersByTimeAsync(500);
+        expect(button.hasAttribute('data-copied')).toBe(false);
+    });
+
+    it('selects the value when the browser refuses, and drops a stale copied mark', async () => {
+        const {input, button} = renderCopyField();
+        const write = vi.spyOn(navigator.clipboard, 'writeText').mockResolvedValue(undefined);
+
+        await copyWith(button);
+        expect(button.hasAttribute('data-copied')).toBe(true);
+
+        write.mockRejectedValue(refused());
+        await copyWith(button);
+
+        expect(button.hasAttribute('data-copied')).toBe(false);
+        expect(button.hasAttribute('data-copy-failed')).toBe(true);
+        expect(document.activeElement).toBe(input);
+        expect([input.selectionStart, input.selectionEnd]).toEqual([0, input.value.length]);
+    });
+
+    it('marks a refusal for 1.5 seconds, restarts them on a second one, and a copy that works replaces it', async () => {
+        const {button} = renderCopyField();
+        const write = vi.spyOn(navigator.clipboard, 'writeText').mockRejectedValue(refused());
+
+        button.click();
+        await vi.advanceTimersByTimeAsync(1_000);
+        expect(button.hasAttribute('data-copy-failed')).toBe(true);
+
+        button.click();
+        await vi.advanceTimersByTimeAsync(1_000);
+        expect(button.hasAttribute('data-copy-failed')).toBe(true);
+
+        await vi.advanceTimersByTimeAsync(500);
+        expect(button.hasAttribute('data-copy-failed')).toBe(false);
+
+        button.click();
+        await vi.advanceTimersByTimeAsync(1_000);
+        write.mockResolvedValue(undefined);
+        await copyWith(button);
+        expect(button.hasAttribute('data-copy-failed')).toBe(false);
+        expect(button.hasAttribute('data-copied')).toBe(true);
+
+        // Past the refusal's 1.5 seconds: its timer was cleared and cannot end the copied mark early.
+        await vi.advanceTimersByTimeAsync(1_000);
+        expect(button.hasAttribute('data-copied')).toBe(true);
+
+        await vi.advanceTimersByTimeAsync(500);
+        expect(button.hasAttribute('data-copied')).toBe(false);
+    });
+
+    it('copies what a textarea holds now', async () => {
+        vi.useFakeTimers();
+        document.body.innerHTML = `
+            <textarea id="all-links" readonly></textarea>
+            <button type="button" data-copy="all-links">Copy</button>`;
+        document.querySelector('textarea').value = 'https://exe.io/a\nhttps://exe.io/b';
+        const write = vi.spyOn(navigator.clipboard, 'writeText').mockResolvedValue(undefined);
+
+        await copyWith(document.querySelector('button'));
+
+        expect(write).toHaveBeenCalledWith('https://exe.io/a\nhttps://exe.io/b');
+    });
+
+    it('copies the text a <pre> shows, and selects it when the browser refuses', async () => {
+        vi.useFakeTimers();
+        document.body.innerHTML = `
+            <pre id="fps-code"><code>&lt;script src="https://exe.io/js/full-page-script.js"&gt;&lt;/script&gt;</code></pre>
+            <button type="button" data-copy="fps-code">Copy</button>`;
+        const pre = document.querySelector('pre');
+        const button = document.querySelector('button');
+        const write = vi.spyOn(navigator.clipboard, 'writeText').mockResolvedValue(undefined);
+
+        await copyWith(button);
+        expect(write).toHaveBeenCalledWith('<script src="https://exe.io/js/full-page-script.js"></script>');
+        expect(button.hasAttribute('data-copied')).toBe(true);
+
+        write.mockRejectedValue(refused());
+        await copyWith(button);
+
+        expect(button.hasAttribute('data-copied')).toBe(false);
+        expect(getSelection()?.anchorNode).toBe(pre);
+    });
+
+    it('copies the text without the whitespace around it', async () => {
+        vi.useFakeTimers();
+        document.body.innerHTML = `
+            <p id="code">
+                ABCD-1234
+            </p>
+            <button type="button" data-copy="code">Copy</button>`;
+        const write = vi.spyOn(navigator.clipboard, 'writeText').mockResolvedValue(undefined);
+
+        await copyWith(document.querySelector('button'));
+
+        expect(write).toHaveBeenCalledWith('ABCD-1234');
+    });
+
+    it('copies the source\'s data-copy-value over the text grouped for reading', async () => {
+        vi.useFakeTimers();
+        document.body.innerHTML = `
+            <code id="setup-key" data-copy-value="JBSWY3DPEHPK3PXP">JBSW Y3DP EHPK 3PXP</code>
+            <button type="button" data-copy="setup-key">Copy</button>`;
+        const write = vi.spyOn(navigator.clipboard, 'writeText').mockResolvedValue(undefined);
+
+        await copyWith(document.querySelector('button'));
+
+        expect(write).toHaveBeenCalledWith('JBSWY3DPEHPK3PXP');
+    });
+
+    it('copies nothing when the page cancels the click, nor when the source is missing', async () => {
+        const {button} = renderCopyField();
+        const write = vi.spyOn(navigator.clipboard, 'writeText').mockResolvedValue(undefined);
+        const refuse = (event) => event.preventDefault();
+        button.addEventListener('click', refuse);
+
+        await copyWith(button);
+        expect(write).not.toHaveBeenCalled();
+        expect(button.hasAttribute('data-copied')).toBe(false);
+
+        button.removeEventListener('click', refuse);
+        button.dataset.copy = 'gone';
+        await copyWith(button);
+        expect(write).not.toHaveBeenCalled();
+    });
+});
+
+describe('copyText', () => {
+    it('answers whether the clipboard took the text', async () => {
+        const write = vi.spyOn(navigator.clipboard, 'writeText').mockResolvedValue(undefined);
+
+        expect(await copyText('https://exe.io/abcd')).toBe(true);
+        expect(write).toHaveBeenCalledWith('https://exe.io/abcd');
+
+        write.mockRejectedValue(refused());
+        expect(await copyText('https://exe.io/abcd')).toBe(false);
+    });
+
+    it('answers false where the page has no clipboard, as on plain http', async () => {
+        vi.stubGlobal('navigator', {});
+
+        expect(await copyText('https://exe.io/abcd')).toBe(false);
+    });
+});
+
+const dialog = (id, attributes = '') => `<dialog id="${id}" ${attributes}><p>BODY</p><button type="button" data-close-modal><span>Cancel</span></button></dialog>`;
+
+const shortenLink = '<a href="/tools/bulk-shorten" data-show-modal="shorten-dialog"><span>Shorten a link</span></a>';
+
+describe('data-show-modal', () => {
+    it('opens the named dialog instead of following the link', () => {
+        document.body.innerHTML = shortenLink + dialog('shorten-dialog');
+
+        // Clicked on the label, as a mouse does, not on the link itself.
+        const event = click(document.querySelector('a span'));
+
+        expect(event.defaultPrevented).toBe(true);
+        expect(document.querySelector('dialog').open).toBe(true);
+    });
+
+    it('lets a modified click follow the link', () => {
+        document.body.innerHTML = shortenLink + dialog('shorten-dialog');
+
+        const event = click(document.querySelector('a span'), {ctrlKey: true});
+
+        expect(event.defaultPrevented).toBe(false);
+        expect(document.querySelector('dialog').open).toBe(false);
+    });
+
+    it('does nothing when the page has no such dialog', () => {
+        document.body.innerHTML = '<button type="button" data-show-modal="cancel-dialog">Cancel subscription</button>';
+
+        expect(click(document.querySelector('button')).defaultPrevented).toBe(false);
+    });
+
+    it('opens nothing when the page cancels the click', () => {
+        document.body.innerHTML = shortenLink + dialog('shorten-dialog');
+        document.querySelector('a').addEventListener('click', (event) => event.preventDefault());
+
+        click(document.querySelector('a'));
+
+        expect(document.querySelector('dialog').open).toBe(false);
+    });
+
+    it('leaves an open dialog open', () => {
+        document.body.innerHTML = shortenLink + dialog('shorten-dialog');
+        const shorten = document.querySelector('dialog');
+        shorten.showModal();
+        const reopen = vi.spyOn(shorten, 'showModal');
+
+        click(document.querySelector('a'));
+
+        expect(reopen).not.toHaveBeenCalled();
+        expect(shorten.open).toBe(true);
+    });
+});
+
+describe('data-close-modal', () => {
+    it('closes its own dialog and fires the native close event', async () => {
+        document.body.innerHTML = dialog('one') + dialog('two');
+        const [one, two] = document.querySelectorAll('dialog');
+        const closed = vi.fn();
+        one.addEventListener('close', closed);
+        one.showModal();
+        two.show();
+
+        click(one.querySelector('[data-close-modal] span'));
+
+        expect([one.open, two.open]).toEqual([false, true]);
+        await vi.waitFor(() => expect(closed).toHaveBeenCalledOnce());
+    });
+
+    it('closes without sending the form it submits', () => {
+        document.body.innerHTML = `
+            <dialog id="disable-2fa">
+                <form method="POST" action="/two-factor"><input name="password" required>
+                    <button data-close-modal>Cancel</button>
+                </form>
+            </dialog>`;
+        const disable = document.querySelector('dialog');
+        const sent = vi.fn((event) => event.preventDefault());
+        disable.querySelector('form').addEventListener('submit', sent);
+        disable.showModal();
+
+        const event = click(disable.querySelector('button'));
+
+        expect(event.defaultPrevented).toBe(true);
+        expect(disable.open).toBe(false);
+        expect(sent).not.toHaveBeenCalled();
+    });
+});
+
+/** A dialog laid out at 100-300 × 100-300, as happy-dom lays nothing out. */
+function renderLightDismiss(attributes = 'closedby="any"') {
+    document.body.innerHTML = dialog('shorten-dialog', attributes);
+    const shorten = document.querySelector('dialog');
+    vi.spyOn(shorten, 'getBoundingClientRect').mockReturnValue({left: 100, right: 300, top: 100, bottom: 300});
+    shorten.showModal();
+
+    return shorten;
+}
+
+/** A press and its click on the dialog element, as the backdrop and the dialog's own padding both land there. */
+function pressAndClick(target, from, to = from) {
+    target.dispatchEvent(new PointerEvent('pointerdown', {bubbles: true, clientX: from[0], clientY: from[1]}));
+    click(target, {clientX: to[0], clientY: to[1]});
+}
+
+const OUTSIDE = [20, 20];
+const INSIDE = [200, 200];
+
+describe('closedby="any"', () => {
+    it('closes the dialog on a click on its backdrop', () => {
+        const shorten = renderLightDismiss();
+
+        pressAndClick(shorten, OUTSIDE);
+
+        expect(shorten.open).toBe(false);
+    });
+
+    it('stays open on a click inside its box', () => {
+        const shorten = renderLightDismiss();
+
+        pressAndClick(shorten, INSIDE);
+        pressAndClick(shorten.querySelector('p'), OUTSIDE);
+
+        expect(shorten.open).toBe(true);
+    });
+
+    it('stays open when a text selection is dragged out of the body onto the backdrop', () => {
+        const shorten = renderLightDismiss();
+
+        pressAndClick(shorten, INSIDE, OUTSIDE);
+
+        expect(shorten.open).toBe(true);
+    });
+
+    it('leaves a dialog without it open', () => {
+        const shorten = renderLightDismiss('');
+
+        pressAndClick(shorten, OUTSIDE);
+
+        expect(shorten.open).toBe(true);
+    });
+
+    it('leaves the dismissal to a browser that does it natively', () => {
+        Object.defineProperty(HTMLDialogElement.prototype, 'closedBy', {configurable: true, get: () => 'any'});
+
+        try {
+            const shorten = renderLightDismiss();
+            const close = vi.spyOn(shorten, 'close');
+
+            pressAndClick(shorten, OUTSIDE);
+
+            expect(close).not.toHaveBeenCalled();
+        } finally {
+            delete HTMLDialogElement.prototype.closedBy;
+        }
+    });
+});

@@ -1,0 +1,64 @@
+{
+    "name": "@ismailnakkar/ui-behaviours",
+    "version": "0.1.0",
+    "description": "Small page behaviours from plain HTML attributes: copy to the clipboard, confirm a submit, send a form once, open, close and light-dismiss a native dialog, check all rows, select a field on click; and a date range picker over Cally, on its own entry.",
+    "keywords": [
+        "clipboard",
+        "dialog",
+        "confirm",
+        "date-range",
+        "cally",
+        "data-attributes",
+        "laravel"
+    ],
+    "homepage": "https://github.com/ismailnakkar/ui-behaviours",
+    "bugs": {
+        "url": "https://github.com/ismailnakkar/ui-behaviours/issues"
+    },
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/ismailnakkar/ui-behaviours.git"
+    },
+    "license": "MIT",
+    "author": {
+        "name": "Ismail Nakkar",
+        "email": "juge.steam@gmail.com"
+    },
+    "type": "module",
+    "main": "src/index.js",
+    "types": "src/index.d.ts",
+    "exports": {
+        ".": {
+            "types": "./src/index.d.ts",
+            "default": "./src/index.js"
+        },
+        "./range-picker": {
+            "types": "./src/range-picker.d.ts",
+            "default": "./src/range-picker.js"
+        }
+    },
+    "files": [
+        "src"
+    ],
+    "sideEffects": false,
+    "publishConfig": {
+        "access": "public"
+    },
+    "scripts": {
+        "test": "vitest run",
+        "prepublishOnly": "npm test"
+    },
+    "peerDependencies": {
+        "cally": "^0.9.2"
+    },
+    "peerDependenciesMeta": {
+        "cally": {
+            "optional": true
+        }
+    },
+    "devDependencies": {
+        "cally": "^0.9.2",
+        "happy-dom": "^21.0.4",
+        "vitest": "^5.1.0"
+    }
+}
