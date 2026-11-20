@@ -1,35 +1,22 @@
-/** How long a copy button keeps data-copied or data-copy-failed. */
+import {closestTo, once} from './helpers.js';
+
 const COPY_FLASH_MS = 1500;
 
 const COPIED = 'data-copied';
 const COPY_FAILED = 'data-copy-failed';
-
-/** The mark a data-submit-once form carries once sent: a second submit is refused until the page is shown again. */
 const SUBMITTING = 'data-submitting';
 
-/** The native light-dismiss value of a dialog's closedby attribute, polyfilled where the browser lacks it. */
+/** closedby's light-dismiss value, polyfilled where the browser lacks it. */
 const CLOSED_BY_ANY = 'any';
 
 const copyTimers = new WeakMap();
 
-let installed = false;
-
-/** The dialog a pointer was pressed on outside its box, so a text selection dragged out of the body doesn't close it. */
+/** The dialog a press landed on outside its box: a selection dragged out of the body must not close it. */
 let pressedBackdrop = null;
 
-/**
- * Listens on the document for every behaviour, and opens the dialogs marked data-open-on-load. Call it once from the
- * layout script; a second call does nothing.
- */
-export function installUiBehaviours() {
-    if (installed) {
-        return;
-    }
-
-    installed = true;
-
+export const installUiBehaviours = once(() => {
     document.addEventListener('submit', confirmSubmit);
-    // After the confirm: a submit refused there was never sent.
+    // After the confirm: a refused submit was never sent.
     document.addEventListener('submit', submitOnce);
     window.addEventListener('pageshow', releaseSubmitted);
     document.addEventListener('change', checkAll);
@@ -41,27 +28,27 @@ export function installUiBehaviours() {
     document.addEventListener('click', closeOnBackdrop);
 
     openOnLoad();
-}
+});
 
-/** navigator.clipboard is absent on plain http and rejects where permission is refused. */
 export async function copyText(text) {
     try {
         await navigator.clipboard.writeText(text);
 
         return true;
     } catch {
+        // Absent on plain http, rejects when refused.
         return false;
     }
 }
 
-/** The element matching $selector at or above a click's target, as a click on a button's label or icon lands there. */
-function closestTo({target}, selector) {
-    return target instanceof Element ? target.closest(selector) : null;
+function isField(element) {
+    return element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement;
 }
 
-/** A click the browser handles itself: not the main button, or a modified one (new tab, new window, download). */
-function isModifiedClick(event) {
-    return event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey;
+/** A link clicked to open elsewhere: a new tab, a new window, a download. */
+function followsLink(opener, event) {
+    return opener instanceof HTMLAnchorElement
+        && (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey);
 }
 
 function confirmSubmit(event) {
@@ -76,7 +63,7 @@ function confirmSubmit(event) {
     }
 }
 
-// The submit is refused, not the buttons disabled: a disabled submitter would drop its name and value from the form.
+// Refuses the submit rather than disabling the buttons: a disabled submitter drops its name and value.
 function submitOnce(event) {
     const form = event.target;
 
@@ -91,7 +78,7 @@ function submitOnce(event) {
     }
 }
 
-// A page restored from the back-forward cache (Back from a payment page) may send its forms again.
+// A page back from the back-forward cache (Back from a payment page) may send its forms again.
 function releaseSubmitted({persisted}) {
     if (persisted) {
         for (const form of document.querySelectorAll(`form[${SUBMITTING}]`)) {
@@ -104,7 +91,6 @@ function checkboxesNamed(name) {
     return [...document.querySelectorAll('input[type="checkbox"]')].filter((box) => box.name === name && !box.disabled);
 }
 
-// The header box sets every row; a row sets the header to checked, unchecked or indeterminate.
 function checkAll({target}) {
     if (!(target instanceof HTMLInputElement) || target.type !== 'checkbox') {
         return;
@@ -124,27 +110,21 @@ function checkAll({target}) {
         if (header.dataset.checkAll === target.name) {
             const rows = checkboxesNamed(target.name);
             const checked = rows.filter((box) => box.checked).length;
-            const total = rows.length;
 
-            header.checked = total > 0 && checked === total;
-            header.indeterminate = checked > 0 && checked < total;
+            header.checked = rows.length > 0 && checked === rows.length;
+            header.indeterminate = checked > 0 && checked < rows.length;
         }
     }
 }
 
 // Tabbing in selects a field's text natively; a click only places a caret.
 function autoselect({target}) {
-    if ((target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) && target.matches('[data-autoselect]')) {
+    if (isField(target) && target.matches('[data-autoselect]')) {
         target.select();
     }
 }
 
-function isField(element) {
-    return element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement;
-}
-
-// data-copy-value wins, for text grouped on screen for reading (a setup key); innerText keeps one line per block
-// (a list of recovery codes), where the browser lays the page out.
+// innerText, not textContent: one line per block as laid out, so a list of recovery codes copies one a line.
 function copiedTextOf(source) {
     if (source.dataset.copyValue !== undefined) {
         return source.dataset.copyValue;
@@ -157,7 +137,6 @@ function copiedTextOf(source) {
     return (source.innerText ?? source.textContent ?? '').trim();
 }
 
-// A page cancels a copy, say to ask for a missing field first, with preventDefault() in its own click listener.
 async function copyButton(event) {
     const button = closestTo(event, '[data-copy]');
     const source = button ? document.getElementById(button.dataset.copy) : null;
@@ -195,12 +174,12 @@ function selectForManualCopy(source) {
     }
 }
 
-// Modified clicks, and triggers whose dialog is not on this page, keep the browser's own behaviour (a link's href).
+// A link's href stays the fallback: a modified click, or a page without the dialog, follows it.
 function showModal(event) {
     const opener = closestTo(event, '[data-show-modal]');
     const dialog = opener ? document.getElementById(opener.dataset.showModal) : null;
 
-    if (!(dialog instanceof HTMLDialogElement) || event.defaultPrevented || isModifiedClick(event)) {
+    if (!(dialog instanceof HTMLDialogElement) || event.defaultPrevented || followsLink(opener, event)) {
         return;
     }
 
@@ -211,7 +190,7 @@ function showModal(event) {
     }
 }
 
-// preventDefault(): a close button that is a form's submit button closes without sending the form.
+// preventDefault(): a submit button closes without sending its form.
 function closeModal(event) {
     const dialog = closestTo(event, '[data-close-modal]')?.closest('dialog');
 
@@ -233,7 +212,7 @@ function lightDismissIsNative() {
     return 'closedBy' in HTMLDialogElement.prototype;
 }
 
-/** The open dialog with closedby="any" whose backdrop the event is on: on the dialog element, outside its box. */
+// A backdrop click lands on the dialog element itself, outside its box.
 function backdropDialogOf({target, clientX, clientY}) {
     if (!(target instanceof HTMLDialogElement) || !target.open || target.getAttribute('closedby') !== CLOSED_BY_ANY) {
         return null;

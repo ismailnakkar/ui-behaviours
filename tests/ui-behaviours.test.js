@@ -96,26 +96,6 @@ describe('data-confirm', () => {
     });
 });
 
-function change(box) {
-    box.dispatchEvent(new Event('change', {bubbles: true}));
-}
-
-function renderRows() {
-    document.body.innerHTML = `
-        <input type="checkbox" data-check-all="ids[]">
-        <input type="checkbox" name="ids[]">
-        <input type="checkbox" name="ids[]" checked>
-        <input type="checkbox" name="ids[]" disabled>
-        <input type="checkbox" name="exclude[]">`;
-
-    return {
-        all: document.querySelector('[data-check-all]'),
-        rows: [...document.querySelectorAll('input[name="ids[]"]:not([disabled])')],
-        locked: document.querySelector('input[disabled]'),
-        other: document.querySelector('input[name="exclude[]"]'),
-    };
-}
-
 describe('data-submit-once', () => {
     it('sends the form once and marks it, keeping the pressed button\'s value', () => {
         document.body.innerHTML = '<form data-submit-once><button name="gateway" value="balance">Pay</button></form>';
@@ -159,6 +139,26 @@ describe('data-submit-once', () => {
         expect(submit(button)).toBe(true);
     });
 });
+
+function change(box) {
+    box.dispatchEvent(new Event('change', {bubbles: true}));
+}
+
+function renderRows() {
+    document.body.innerHTML = `
+        <input type="checkbox" data-check-all="ids[]">
+        <input type="checkbox" name="ids[]">
+        <input type="checkbox" name="ids[]" checked>
+        <input type="checkbox" name="ids[]" disabled>
+        <input type="checkbox" name="exclude[]">`;
+
+    return {
+        all: document.querySelector('[data-check-all]'),
+        rows: [...document.querySelectorAll('input[name="ids[]"]:not([disabled])')],
+        locked: document.querySelector('input[disabled]'),
+        other: document.querySelector('input[name="exclude[]"]'),
+    };
+}
 
 describe('data-check-all', () => {
     it('ticks and unticks every row it names to match the header box, and nothing else', () => {
@@ -414,6 +414,14 @@ describe('data-show-modal', () => {
 
         expect(event.defaultPrevented).toBe(false);
         expect(document.querySelector('dialog').open).toBe(false);
+    });
+
+    it('opens the dialog on a modified click on a button, which has no link to follow', () => {
+        document.body.innerHTML = '<button type="button" data-show-modal="shorten-dialog">Shorten a link</button>' + dialog('shorten-dialog');
+
+        click(document.querySelector('button'), {shiftKey: true});
+
+        expect(document.querySelector('dialog').open).toBe(true);
     });
 
     it('does nothing when the page has no such dialog', () => {

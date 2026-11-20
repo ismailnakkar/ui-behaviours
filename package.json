@@ -1,7 +1,7 @@
 {
     "name": "@ismailnakkar/ui-behaviours",
     "version": "0.1.0",
-    "description": "Small page behaviours from plain HTML attributes: copy to the clipboard, confirm a submit, send a form once, open, close and light-dismiss a native dialog, check all rows, select a field on click; and a date range picker over Cally, on its own entry.",
+    "description": "Page behaviours from plain HTML attributes (copy, confirm, submit once, native dialogs, check all, autoselect), and a date range picker over Cally.",
     "keywords": [
         "clipboard",
         "dialog",
@@ -40,7 +40,9 @@
     "files": [
         "src"
     ],
-    "sideEffects": false,
+    "sideEffects": [
+        "./src/range-picker.js"
+    ],
     "publishConfig": {
         "access": "public"
     },

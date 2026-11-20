@@ -1,10 +1,11 @@
 # @ismailnakkar/ui-behaviours
 
-Small page behaviours driven by plain HTML attributes: copy to the clipboard, confirm a submit, send a form once, open,
-close and light-dismiss a native `<dialog>`, check every row from a header box, and select a field's text on a click.
-One call installs them all as delegated listeners on the document, so markup added later works too. A date range picker
-over [Cally](https://wicky.nillia.ms/cally/) sits on its own entry, so pages without one never load the calendar. The
-package ships no styles and no wording: the app styles the states it sets, and every question or label comes from the
+Page behaviours from plain HTML attributes: copy to the clipboard, confirm a submit, send a form once, open, close and
+light-dismiss a native `<dialog>`, check every row from a header box, and select a field's text on a click. One call
+installs them as listeners on the document, so markup added later works too.
+
+A date range picker over [Cally](https://wicky.nillia.ms/cally/) has its own entry, so pages without one never load the
+calendar. The package ships no styles and no wording: the app styles the states it sets, and every word comes from the
 app's markup.
 
 ## Install
@@ -26,8 +27,8 @@ import {installUiBehaviours} from '@ismailnakkar/ui-behaviours';
 installUiBehaviours();
 ```
 
-A second call does nothing: no second set of listeners, and no dialog opened again. Run it after the page is parsed
-(a module script, or a deferred one), as it opens the `data-open-on-load` dialogs there and then.
+Run it after the page is parsed (a module script, or a deferred one): it opens the `data-open-on-load` dialogs there and
+then. A second call does nothing.
 
 `copyText(text)` is the clipboard write the copy buttons use, for a page's own script (copying a link it just made):
 it resolves to `true` when the clipboard took the text, `false` where `navigator.clipboard` is absent (plain http) or
@@ -43,6 +44,19 @@ if (!(await copyText(url))) {
 
 ## The attributes
 
+| Attribute | On | Does |
+|---|---|---|
+| [`data-copy="id"`](#data-copyid) | a button | copies the element with that id |
+| [`data-copy-value`](#data-copyid) | the copied element | the text to copy instead of what it shows |
+| [`data-confirm="question"`](#data-confirmquestion) | a form or a submit button | asks before submitting |
+| [`data-submit-once`](#data-submit-once) | a form | refuses a second submit |
+| [`data-show-modal="id"`](#data-show-modalid) | a button or a link | opens the dialog with that id as a modal |
+| [`data-close-modal`](#data-close-modal) | a button in a dialog | closes that dialog |
+| [`closedby="any"`](#closedbyany) | a dialog | closes it on a backdrop click |
+| [`data-open-on-load`](#data-open-on-load) | a dialog | opens it on install |
+| [`data-check-all="name"`](#data-check-allname) | a header checkbox | checks every row named `name` |
+| [`data-autoselect`](#data-autoselect) | an input or a textarea | selects its text on a click |
+
 ### `data-copy="id"`
 
 On a button: a click copies the element with that id. That is its `data-copy-value` when it has one (text grouped on
@@ -50,7 +64,7 @@ screen for reading, such as a setup key), else an input's or a textarea's curren
 (`innerText`: one line per block, so a list copies one item a line), trimmed.
 
 ```html
-<input id="short-url" value="https://cuty.io/abcd" readonly data-autoselect>
+<input id="short-url" value="https://example.com/abcd" readonly data-autoselect>
 <button type="button" data-copy="short-url"><span>Copy</span><span>Copied</span></button>
 
 <code id="setup-key" data-copy-value="JBSWY3DPEHPK3PXP">JBSW Y3DP EHPK 3PXP</code>
@@ -93,8 +107,8 @@ restored from the back-forward cache (Back from a provider's page) drops the mar
 ### `data-show-modal="id"`
 
 On a button or a link: a click opens the `<dialog>` with that id with `showModal()` (Escape closes it, focus moves in,
-the page behind is inert). On a link, the `href` is the fallback: a modified click (new tab, new window), or a page
-without that dialog, follows it. A click the page cancelled opens nothing, and an open dialog stays as it is.
+the page behind is inert). On a link, the `href` is the fallback: a modified click (new tab, new window) follows it, as
+does any click on a page without that dialog. A click the page cancelled opens nothing, and an open dialog stays open.
 
 ```html
 <a href="/links/create" data-show-modal="shorten-dialog">Shorten a link</a>
@@ -147,7 +161,7 @@ Setting the rows from the header fires no `change` on them: a page counting sele
 On an input or a textarea: a click selects all of its text, as tabbing in already does natively.
 
 ```html
-<input value="https://cuty.io/abcd" readonly data-autoselect>
+<input value="https://example.com/abcd" readonly data-autoselect>
 ```
 
 ## Styling
@@ -212,10 +226,9 @@ import {installRangePicker} from '@ismailnakkar/ui-behaviours/range-picker';
 installRangePicker();
 ```
 
-As with `installUiBehaviours()`: call it once, after the page is parsed; a second call does nothing. It listens on the
-document, so a picker added later works too, and it writes the labels of the pickers already on the page from their
-fields, so they read as a pick will, and moves their calendars to the end day; one added later keeps the server's
-labels and view until its first pick.
+As with `installUiBehaviours()`, call it after the page is parsed; a second call does nothing. For each picker already
+on the page it rewrites the labels from the fields and moves the calendar to the end day. A picker added later works
+too, but keeps the server's labels and view until its first pick.
 
 It needs the browser's Popover API (Chrome 114, Safari 17, Firefox 125), which npm cannot check: without it the button
 opens nothing and the box shows in place, where its radios and fields still submit.
@@ -305,8 +318,8 @@ style `[data-range-state="pending"] label:has([data-range-custom])` as checked, 
 
 ### Events
 
-The package fires none of its own. Cally's `change` and `rangestart` do not bubble, so the package listens to them in
-the capture phase; a page's own listener does the same. The radios fire the native `change`.
+The package fires none of its own. Cally's `change` and `rangestart` do not bubble, so listen to them in the capture
+phase, as the package does. The radios fire the native `change`.
 
 ### Accessibility
 
@@ -329,23 +342,3 @@ customElements.define('calendar-range', class extends HTMLElement {
     tentative = '';
 });
 ```
-
-## Upgrading
-
-### From an app's own code
-
-0.1.0 is the first release. An app moving from its own copy of these behaviours changes:
-
-- **exe** (`resources/js/site/behaviours.ts`): `data-check-all` names its rows, `data-check-all="ids[]"`. Copy marks
-  last 1.5 seconds, not 2. `data-dismiss` and `data-dropdown` are exe's alone and stay in its own script.
-  `copyText` comes from the package.
-- **cuty** (`modal.js`, `copy.js`): `id="modal-open-{id}"` openers become `data-show-modal="modal-{id}"`,
-  `data-modal-close` becomes `data-close-modal`, the backdrop click needs `closedby="any"` on the dialog, and
-  `data-open-on-load` stays. On a copy source, `data-key` becomes `data-copy-value` and the source gets the id the
-  button's `data-copy` names; `.copied-button` becomes `[data-copied]`.
-- **upfiles** (`copy-buttons.js`, `confirm-action.js`, `form-affordances.js`, the select-all boxes):
-  `data-copy-target="#id"` becomes `data-copy="id"`, with both labels in the button styled on `[data-copied]` and
-  `[data-copy-failed]` instead of `data-copied-label` and `data-failed-label`; `data-confirm` on a submit button is
-  unchanged, and on a form now works too; a refused copy selects the field instead of trying
-  `document.execCommand('copy')`; `data-select-on-focus` becomes `data-autoselect`; a `#select-all` box
-  becomes `data-check-all="{its rows' name}"`.
