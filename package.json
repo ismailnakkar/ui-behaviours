@@ -1,6 +1,6 @@
 {
     "name": "@ismailnakkar/ui-behaviours",
-    "version": "0.1.0",
+    "version": "0.2.0",
     "description": "Page behaviours from plain HTML attributes (copy, confirm, submit once, native dialogs, check all, autoselect), and a date range picker over Cally.",
     "keywords": [
         "clipboard",

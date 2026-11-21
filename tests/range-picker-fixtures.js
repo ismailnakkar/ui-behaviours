@@ -50,9 +50,9 @@ export function rangePicker({id = 'report-range', locale = 'en-GB', lang = 'en'}
             </button>
             <div id="${id}" popover data-range-picker data-range-state="preset">
                 <div role="radiogroup" aria-label="Range">
-                    <label><input type="radio" name="range" value="today" data-from="2026-11-20" data-to="2026-11-20"> Today</label>
-                    <label><input type="radio" name="range" value="last7" data-from="2026-11-14" data-to="2026-11-20" checked> Last 7 days</label>
-                    <label><input type="radio" name="range" value="lastMonth" data-from="2026-10-01" data-to="2026-10-31"> Last month</label>
+                    <label><input type="radio" name="range" value="today" data-range-preset="2026-11-20/2026-11-20"> Today</label>
+                    <label><input type="radio" name="range" value="last7" data-range-preset="2026-11-14/2026-11-20" checked> Last 7 days</label>
+                    <label><input type="radio" name="range" value="lastMonth" data-range-preset="2026-10-01/2026-10-31"> Last month</label>
                     <label>
                         <input type="radio" name="range" value="custom" data-range-custom>
                         <svg aria-hidden="true"></svg>

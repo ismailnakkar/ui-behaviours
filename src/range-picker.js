@@ -11,12 +11,13 @@ const State = Object.freeze({preset: 'preset', custom: 'custom', pending: 'pendi
 /** data-range-dates="compact" leaves out a year both ends share. */
 const COMPACT = 'compact';
 
-/** Between the two days of a Cally range value: "2026-11-14/2026-11-20". */
+/** Between the two days of a Cally range value, and of a preset's data-range-preset: "2026-11-14/2026-11-20". */
 const VALUE_SEPARATOR = '/';
 
 /** A spaced en dash: "14 Nov – 20 Nov 2026". */
 const DATES_SEPARATOR = ' – ';
 
+// In UTC, as dayOf() reads each day as its UTC midnight.
 const DAY = {day: 'numeric', month: 'short', timeZone: 'UTC'};
 const DAY_AND_YEAR = {...DAY, year: 'numeric'};
 
@@ -43,11 +44,12 @@ function isRadio(element) {
 
 function pickRange(event) {
     const picker = closestTo(event, PICKER);
-    const target = event.target;
 
     if (!picker) {
         return;
     }
+
+    const target = event.target;
 
     if (isCalendar(target)) {
         const [from, to] = target.value.split(VALUE_SEPARATOR);
@@ -77,15 +79,20 @@ function pickStart(event) {
     }
 
     const start = isoOf(event.detail);
+    const range = {state: State.pending, name: nameOf(customRadioOf(picker)), from: start, to: start};
 
-    showIn(picker, {state: State.pending, name: nameOf(customRadioOf(picker)), from: start, to: start}, localeOf(picker));
+    showIn(picker, range, localeOf(picker));
 }
 
-/** A preset radio's days, worked out by the server; null for Custom range. */
+/** A preset radio's days, worked out by the server, from its data-range-preset="from/to"; null for Custom range. */
 function presetOf(radio) {
-    const {from, to} = radio?.dataset ?? {};
+    const [from, to] = radio?.dataset.rangePreset?.split(VALUE_SEPARATOR) ?? [];
 
     return from && to ? {from, to} : null;
+}
+
+function calendarOf(picker) {
+    return picker.querySelector(CALENDAR);
 }
 
 function checkedRadioOf(picker) {
@@ -106,7 +113,7 @@ function checkCustom(picker) {
 
 /** Drops a start still waiting for its end day. */
 function dropStart(picker) {
-    const calendar = picker.querySelector(CALENDAR);
+    const calendar = calendarOf(picker);
 
     if (calendar) {
         calendar.tentative = '';
@@ -114,7 +121,7 @@ function dropStart(picker) {
 }
 
 function moveCalendar(picker, from, to) {
-    const calendar = picker.querySelector(CALENDAR);
+    const calendar = calendarOf(picker);
 
     if (calendar) {
         calendar.value = from + VALUE_SEPARATOR + to;
@@ -124,11 +131,11 @@ function moveCalendar(picker, from, to) {
 
 /**
  * Ends the two months on the end day's and focuses that day. Cally pages to a far day by whole pages, which can leave
- * it in the first month: so first the month before, then, a task later once Cally has redrawn, the day itself, one
- * month on (page-by="single").
+ * it in the first month. So the view goes to the month before first, then, a task later once Cally has redrawn, to the
+ * day itself: one page on with page-by="single".
  */
 function viewEndDay(picker, to) {
-    const calendar = picker.querySelector(CALENDAR);
+    const calendar = calendarOf(picker);
     const monthBefore = dayOf(to);
 
     if (!calendar || !monthBefore) {
@@ -204,12 +211,13 @@ function openersOf(picker) {
         return [];
     }
 
-    return [...document.querySelectorAll('[popovertarget]')].filter((opener) => opener.getAttribute('popovertarget') === picker.id);
+    return [...document.querySelectorAll('[popovertarget]')]
+        .filter((opener) => opener.getAttribute('popovertarget') === picker.id);
 }
 
 /** The calendar's locale, so the labels match its months; else the page's lang. */
 function localeOf(picker) {
-    return picker.querySelector(CALENDAR)?.getAttribute('locale') || picker.closest('[lang]')?.lang || undefined;
+    return calendarOf(picker)?.getAttribute('locale') || picker.closest('[lang]')?.lang || undefined;
 }
 
 function isoOf(day) {

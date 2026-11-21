@@ -21,7 +21,7 @@ export const installUiBehaviours = once(() => {
     window.addEventListener('pageshow', releaseSubmitted);
     document.addEventListener('change', checkAll);
     document.addEventListener('click', autoselect);
-    document.addEventListener('click', copyButton);
+    document.addEventListener('click', copyOnClick);
     document.addEventListener('click', showModal);
     document.addEventListener('click', closeModal);
     document.addEventListener('pointerdown', pressBackdrop);
@@ -88,7 +88,7 @@ function releaseSubmitted({persisted}) {
 }
 
 function checkboxesNamed(name) {
-    return [...document.querySelectorAll('input[type="checkbox"]')].filter((box) => box.name === name && !box.disabled);
+    return [...document.getElementsByName(name)].filter((box) => box.type === 'checkbox' && !box.disabled);
 }
 
 function checkAll({target}) {
@@ -134,10 +134,10 @@ function copiedTextOf(source) {
         return source.value;
     }
 
-    return (source.innerText ?? source.textContent ?? '').trim();
+    return (source.innerText ?? source.textContent).trim();
 }
 
-async function copyButton(event) {
+async function copyOnClick(event) {
     const button = closestTo(event, '[data-copy]');
     const source = button ? document.getElementById(button.dataset.copy) : null;
 
@@ -147,14 +147,14 @@ async function copyButton(event) {
 
     const copied = await copyText(copiedTextOf(source));
 
-    flashCopied(button, copied);
+    flashCopyResult(button, copied);
 
     if (!copied) {
         selectForManualCopy(source);
     }
 }
 
-function flashCopied(button, copied) {
+function flashCopyResult(button, copied) {
     clearTimeout(copyTimers.get(button));
     button.toggleAttribute(COPIED, copied);
     button.toggleAttribute(COPY_FAILED, !copied);
@@ -164,7 +164,7 @@ function flashCopied(button, copied) {
     }, COPY_FLASH_MS));
 }
 
-// Explicit focus(): Safari does not focus a clicked button.
+// select() alone may leave the field unfocused; focused, Ctrl/Cmd+C copies it by hand.
 function selectForManualCopy(source) {
     if (isField(source)) {
         source.focus();

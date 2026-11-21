@@ -1,8 +1,8 @@
 # @ismailnakkar/ui-behaviours
 
 Page behaviours from plain HTML attributes: copy to the clipboard, confirm a submit, send a form once, open, close and
-light-dismiss a native `<dialog>`, check every row from a header box, and select a field's text on a click. One call
-installs them as listeners on the document, so markup added later works too.
+light-dismiss a native `<dialog>`, check every row from a header box, and select a field's text on a click. They listen
+on the document, so markup added later works too.
 
 A date range picker over [Cally](https://wicky.nillia.ms/cally/) has its own entry, so pages without one never load the
 calendar. The package ships no styles and no wording: the app styles the states it sets, and every word comes from the
@@ -14,12 +14,13 @@ app's markup.
 npm i @ismailnakkar/ui-behaviours
 ```
 
-No dependencies for the behaviours. The [range picker](#range-picker) needs Cally 0.9, an optional peer dependency:
-`npm i cally`. Type declarations are included.
+The behaviours have no dependencies. The [range picker](#range-picker) needs Cally 0.9.2 or a later 0.9 release, an
+optional peer dependency (`npm i cally`). Type declarations are included.
 
 ## Usage
 
-Call it once from the layout's script, on every page:
+Call `installUiBehaviours()` once from the layout's script, on every page, after the page is parsed (a module or a
+deferred script): it also opens the page's `data-open-on-load` dialogs. A second call does nothing.
 
 ```js
 import {installUiBehaviours} from '@ismailnakkar/ui-behaviours';
@@ -27,22 +28,7 @@ import {installUiBehaviours} from '@ismailnakkar/ui-behaviours';
 installUiBehaviours();
 ```
 
-Run it after the page is parsed (a module script, or a deferred one): it opens the `data-open-on-load` dialogs there and
-then. A second call does nothing.
-
-`copyText(text)` is the clipboard write the copy buttons use, for a page's own script (copying a link it just made):
-it resolves to `true` when the clipboard took the text, `false` where `navigator.clipboard` is absent (plain http) or
-refuses.
-
-```js
-import {copyText} from '@ismailnakkar/ui-behaviours';
-
-if (!(await copyText(url))) {
-    field.select();
-}
-```
-
-## The attributes
+Then mark up the page:
 
 | Attribute | On | Does |
 |---|---|---|
@@ -59,9 +45,11 @@ if (!(await copyText(url))) {
 
 ### `data-copy="id"`
 
-On a button: a click copies the element with that id. That is its `data-copy-value` when it has one (text grouped on
-screen for reading, such as a setup key), else an input's or a textarea's current value, else its text as laid out
-(`innerText`: one line per block, so a list copies one item a line), trimmed.
+On a button: a click copies the element with that id, taking the first of:
+
+1. its `data-copy-value`, for text grouped on screen for reading, such as a setup key;
+2. an input's or a textarea's current value;
+3. its text as laid out (`innerText`: one line per block, so a list copies one item a line), trimmed.
 
 ```html
 <input id="short-url" value="https://example.com/abcd" readonly data-autoselect>
@@ -71,12 +59,12 @@ screen for reading, such as a setup key), else an input's or a textarea's curren
 <button type="button" data-copy="setup-key">Copy key</button>
 ```
 
-The button gets `data-copied` for 1.5 seconds when the copy worked, or `data-copy-failed` when the browser refused;
-the field or text is then selected, focused for a field, so the user copies it by hand. A second click restarts the
-1.5 seconds and replaces the other mark. A missing source copies nothing.
+The button gets `data-copied` when the copy worked, or `data-copy-failed` when the browser refused, for 1.5 seconds; a
+second click restarts the 1.5 seconds and replaces the other mark. On a refusal the field or text is selected, a field
+focused too, so the user copies it by hand. A missing source copies nothing.
 
-To refuse a copy (asking for a missing field first), call `event.preventDefault()` in a click listener of the page's
-own on the button or an element around it: the copy skips a cancelled click.
+To refuse a copy (asking for a missing field first), call `event.preventDefault()` in a click listener of your own on
+the button or an element around it: the copy skips a cancelled click.
 
 ### `data-confirm="question"`
 
@@ -93,9 +81,10 @@ form's. A submit the page already cancelled asks nothing.
 ### `data-submit-once`
 
 On a form: the first submit goes and marks the form `data-submitting`; every later one is refused, so a double click on
-a payment button pays once. The buttons stay enabled, as a disabled submitter would drop its `name` and `value` from
-the form; style the mark to show the wait. A submit `data-confirm` refused was never sent and leaves no mark. A page
-restored from the back-forward cache (Back from a provider's page) drops the mark, so its forms send again.
+a payment button pays once. The buttons stay enabled, as a disabled submitter would drop its `name` and `value`; style
+the mark to show the wait. A submit refused by `data-confirm`, or cancelled by a listener on the form, was never sent
+and leaves no mark. A page restored from the back-forward cache (Back from a provider's page) drops the mark, so its
+forms send again.
 
 ```html
 <form method="POST" action="/subscription" data-submit-once>
@@ -106,9 +95,9 @@ restored from the back-forward cache (Back from a provider's page) drops the mar
 
 ### `data-show-modal="id"`
 
-On a button or a link: a click opens the `<dialog>` with that id with `showModal()` (Escape closes it, focus moves in,
-the page behind is inert). On a link, the `href` is the fallback: a modified click (new tab, new window) follows it, as
-does any click on a page without that dialog. A click the page cancelled opens nothing, and an open dialog stays open.
+On a button or a link: a click opens the `<dialog>` with that id with `showModal()`. On a link the `href` is the
+fallback: a modified click (new tab, new window) follows it, as does any click on a page without that dialog. A click
+the page cancelled opens nothing, and an open dialog stays open.
 
 ```html
 <a href="/links/create" data-show-modal="shorten-dialog">Shorten a link</a>
@@ -116,20 +105,20 @@ does any click on a page without that dialog. A click the page cancelled opens n
 
 ### `data-close-modal`
 
-On a button inside a dialog: a click closes that dialog (the native `close` event fires). On a submit button it closes
-without sending the form, so a Cancel button may sit in the dialog's form.
+On a button inside a dialog: a click closes that dialog, and the native `close` event fires. On a submit button it
+closes without sending the form, so a Cancel button may sit in the dialog's form.
 
 ```html
 <button type="button" data-close-modal>Cancel</button>
 ```
 
-The native `<form method="dialog">` closes a dialog without script, as does Escape.
+Without script, `<form method="dialog">` and Escape close a dialog natively.
 
 ### `closedby="any"`
 
-On a dialog: the native attribute for light dismiss. A click on the backdrop closes the dialog; a press inside its box
-dragged out onto the backdrop (a text selection) does not. Where the browser supports `closedby` the package leaves it
-to the browser, elsewhere it does it itself.
+On a dialog: the native light-dismiss attribute. A click on the backdrop closes the dialog; a press inside its box
+dragged out onto the backdrop (a text selection) does not. A browser that supports `closedby` does this itself;
+elsewhere the package does.
 
 ```html
 <dialog id="shorten-dialog" aria-labelledby="shorten-dialog-title" closedby="any">…</dialog>
@@ -154,11 +143,11 @@ changes, the header follows: checked when every row is, indeterminate when some 
 <input type="checkbox" name="ids[]" value="5">
 ```
 
-Setting the rows from the header fires no `change` on them: a page counting selected rows listens to the header too.
+The header sets the rows without firing `change` on them, so a page counting selected rows listens to the header too.
 
 ### `data-autoselect`
 
-On an input or a textarea: a click selects all of its text, as tabbing in already does natively.
+On an input or a textarea: a click selects all of its text, as tabbing in already does.
 
 ```html
 <input value="https://example.com/abcd" readonly data-autoselect>
@@ -168,8 +157,9 @@ On an input or a textarea: a click selects all of its text, as tabbing in alread
 
 The package sets attributes and the browser's own states; the app styles them:
 
-- `[data-copied]` and `[data-copy-failed]` on a copy button: show its "Copied" or "Copy it by hand" label, hide
+- `[data-copied]` and `[data-copy-failed]` on a copy button: show its "Copied" or "Copy it by hand" label instead of
   "Copy". The words are the app's, in the button.
+- `[data-submitting]` on a form sent once, to show the wait.
 - `dialog`, `dialog::backdrop`, and `dialog[open]` for an opening transition.
 - `:indeterminate` on a header checkbox, if the app restyles checkboxes.
 
@@ -195,10 +185,6 @@ The package sets attributes and the browser's own states; the app styles them:
 }
 ```
 
-## Events
-
-The package fires none of its own. A dialog's native `close` event fires when a close button or the backdrop closes it.
-
 ## Accessibility
 
 - Dialogs are native `<dialog>` opened with `showModal()`: focus moves in, the page behind is inert, Escape closes,
@@ -208,17 +194,10 @@ The package fires none of its own. A dialog's native `close` event fires when a 
 - The copy marks change an attribute only, so screen readers announce nothing. A page that needs it adds a
   `role="status"` line and fills it when `data-copied` appears (a `MutationObserver`).
 
-## Testing
-
-The listeners need a DOM, so run your app's tests in happy-dom or jsdom (Vitest: `environment: 'happy-dom'`). They sit
-on the document and outlive a test's markup: install them once per test file (`beforeAll`).
-
-Run this package's suite with `npm test`.
-
 ## Range picker
 
 A date range for a GET form: a button opens a native popover with the app's preset ranges beside a Cally
-`<calendar-range>`, and the picks fill the form's `from` and `to` fields. It is its own entry, which loads Cally:
+`<calendar-range>`, and the picks fill the form's `from` and `to` fields. Its own entry loads Cally:
 
 ```js
 import {installRangePicker} from '@ismailnakkar/ui-behaviours/range-picker';
@@ -226,9 +205,9 @@ import {installRangePicker} from '@ismailnakkar/ui-behaviours/range-picker';
 installRangePicker();
 ```
 
-As with `installUiBehaviours()`, call it after the page is parsed; a second call does nothing. For each picker already
-on the page it rewrites the labels from the fields and moves the calendar to the end day. A picker added later works
-too, but keeps the server's labels and view until its first pick.
+Call it after the page is parsed; a second call does nothing. For each picker already on the page it rewrites the
+labels from the fields and moves the calendar to the end day. A picker added later works too, but keeps the server's
+labels and view until its first pick.
 
 It needs the browser's Popover API (Chrome 114, Safari 17, Firefox 125), which npm cannot check: without it the button
 opens nothing and the box shows in place, where its radios and fields still submit.
@@ -245,8 +224,8 @@ opens nothing and the box shows in place, where its radios and fields still subm
 
     <div id="report-range" popover data-range-picker data-range-state="preset">
         <div role="radiogroup" aria-label="Range">
-            <label><input type="radio" name="range" value="today" data-from="2026-11-20" data-to="2026-11-20"> Today</label>
-            <label><input type="radio" name="range" value="last7" data-from="2026-11-14" data-to="2026-11-20" checked> Last 7 days</label>
+            <label><input type="radio" name="range" value="today" data-range-preset="2026-11-20/2026-11-20"> Today</label>
+            <label><input type="radio" name="range" value="last7" data-range-preset="2026-11-14/2026-11-20" checked> Last 7 days</label>
             <label><input type="radio" name="range" value="custom" data-range-custom> Custom range</label>
         </div>
 
@@ -274,9 +253,10 @@ opens nothing and the box shows in place, where its radios and fields still subm
 
 - **`data-range-picker`** marks the box holding the rest, a `popover` here. Its buttons are the elements whose
   `popovertarget` names its id.
-- **`data-from` and `data-to`** on a preset's radio give its days as `YYYY-MM-DD`; the server works them out, the
-  package does no calendar maths. Picking it sets the calendar's `value` and moves its view so the two months end on
-  the end day's, with keyboard focus on that day (this needs `page-by="single"`), then fills the fields and labels.
+- **`data-range-preset="from/to"`** on a preset's radio gives its days as `YYYY-MM-DD/YYYY-MM-DD`, the format of
+  Cally's `value`; the server works them out, the package does no calendar maths. Picking it sets the calendar's
+  `value` and moves its view so the two months end on the end day's, with keyboard focus on that day (this needs
+  `page-by="single"`), then fills the fields and labels.
 - **`data-range-custom`** on the Custom range radio: two days picked on the calendar check it and fill the fields.
   While only the start is picked, the picker shows that day alone, named as Custom range, and the radios, the fields and
   the buttons keep the range the form sends. Paging the calendar or changing its year or month only moves the view and
@@ -296,7 +276,7 @@ opens nothing and the box shows in place, where its radios and fields still subm
 Render the labels and the states on the server too: they are what shows before the script runs, and on a picker added
 later until its first pick.
 
-### Styling
+### Styling the picker
 
 The words for each state are the app's, in the markup; the app shows the ones `data-range-state` calls for:
 
@@ -316,22 +296,44 @@ The words for each state are the app's, in the markup; the app shows the ones `d
 While `pending` the checked radio is still the range the form sends. To show Custom range as the one being picked,
 style `[data-range-state="pending"] label:has([data-range-custom])` as checked, and the checked label as not.
 
-### Events
-
-The package fires none of its own. Cally's `change` and `rangestart` do not bubble, so listen to them in the capture
-phase, as the package does. The radios fire the native `change`.
-
-### Accessibility
+### The picker's accessibility
 
 - Label the radio group (`aria-label`) and the button (`aria-labelledby` on its field label and itself), and give the
   summary `aria-live="polite"`, so a pick is read out.
 - Give Cally's previous and next slots an `aria-label`, and its year select a `label` slot.
 
-### Testing
+## API
 
-happy-dom and jsdom cannot run Cally. Mock it, and define a `calendar-range` of your own that holds `value`,
-`focusedDate` and `tentative`, and dispatches Cally's events, not bubbling: `change` once `value` holds both days,
-`rangestart` with the start day as a `Date` in `detail`.
+| Import | Does |
+|---|---|
+| `installUiBehaviours()` | listens on the document for every behaviour above and opens the `data-open-on-load` dialogs; later calls do nothing |
+| `copyText(text)` | the copy buttons' clipboard write: resolves to `true` when the clipboard took the text, `false` where `navigator.clipboard` is absent (plain http) or refuses |
+| `installRangePicker()`, from `@ismailnakkar/ui-behaviours/range-picker` | listens on the document for range pickers and writes those already on the page; later calls do nothing |
+
+`copyText()` serves a page's own script, copying a link it just made:
+
+```js
+import {copyText} from '@ismailnakkar/ui-behaviours';
+
+if (!(await copyText(url))) {
+    field.select();
+}
+```
+
+## Events
+
+The package fires none of its own. A dialog's native `close` fires when a close button or the backdrop closes it, and
+the range picker's radios fire the native `change`. Cally's `change` and `rangestart` do not bubble: listen to them in
+the capture phase, as the package does.
+
+## Testing
+
+The listeners need a DOM, so run your app's tests in happy-dom or jsdom (Vitest: `environment: 'happy-dom'`). They sit
+on the document and outlive a test's markup: install them once per test file (`beforeAll`).
+
+happy-dom and jsdom cannot run Cally. For the range picker, mock it, and define a `calendar-range` of your own that
+holds `value`, `focusedDate` and `tentative`, and dispatches Cally's events, not bubbling: `change` once `value` holds
+both days, `rangestart` with the start day as a `Date` in `detail`.
 
 ```js
 vi.mock('cally', () => ({}));
@@ -342,3 +344,13 @@ customElements.define('calendar-range', class extends HTMLElement {
     tentative = '';
 });
 ```
+
+Run this package's suite with `npm test`.
+
+## Upgrading
+
+### From 0.1
+
+- A preset radio gives its days in one attribute, `data-range-preset="from/to"`, in place of `data-from` and `data-to`:
+  `data-from="2026-11-14" data-to="2026-11-20"` becomes `data-range-preset="2026-11-14/2026-11-20"`. The old pair is
+  no longer read: picking a radio marked with it fills nothing, and checked it shows as `custom`.
