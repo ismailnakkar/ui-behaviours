@@ -14,3 +14,7 @@ export function once(install) {
 export function closestTo({target}, selector) {
     return target instanceof Element ? target.closest(selector) : null;
 }
+
+export function isRadio(element) {
+    return element instanceof HTMLInputElement && element.type === 'radio';
+}

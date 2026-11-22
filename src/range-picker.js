@@ -1,5 +1,5 @@
 import 'cally';
-import {closestTo, once} from './helpers.js';
+import {closestTo, isRadio, once} from './helpers.js';
 
 const PICKER = '[data-range-picker]';
 const CALENDAR = 'calendar-range';
@@ -36,10 +36,6 @@ export const installRangePicker = once(() => {
 
 function isCalendar(element) {
     return element.localName === CALENDAR;
-}
-
-function isRadio(element) {
-    return element instanceof HTMLInputElement && element.type === 'radio';
 }
 
 function pickRange(event) {

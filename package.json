@@ -1,7 +1,7 @@
 {
     "name": "@ismailnakkar/ui-behaviours",
-    "version": "0.2.0",
-    "description": "Page behaviours from plain HTML attributes (copy, confirm, submit once, native dialogs, check all, autoselect), and a date range picker over Cally.",
+    "version": "0.3.0",
+    "description": "Page behaviours from plain HTML attributes (copy, confirm, submit once, native dialogs, steps, show by a radio, check all, autoselect), and a date range picker over Cally with an optional stylesheet.",
     "keywords": [
         "clipboard",
         "dialog",
@@ -9,6 +9,7 @@
         "date-range",
         "cally",
         "data-attributes",
+        "stepper",
         "laravel"
     ],
     "homepage": "https://github.com/ismailnakkar/ui-behaviours",
@@ -35,13 +36,18 @@
         "./range-picker": {
             "types": "./src/range-picker.d.ts",
             "default": "./src/range-picker.js"
+        },
+        "./range-picker.css": {
+            "types": "./src/range-picker.d.css.ts",
+            "default": "./src/range-picker.css"
         }
     },
     "files": [
         "src"
     ],
     "sideEffects": [
-        "./src/range-picker.js"
+        "./src/range-picker.js",
+        "./src/range-picker.css"
     ],
     "publishConfig": {
         "access": "public"

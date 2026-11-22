@@ -1,0 +1,410 @@
+/*
+ * The range picker's look (README, "Styling the picker"): its button, the popover with the presets beside the calendar,
+ * and Cally's parts. Every app value is a custom property; the defaults sit in :where(:root), so any rule of the app's
+ * wins. The properties left out here default, where they are used, to the one named beside them in the README.
+ *
+ * Light colours only: Lightning CSS (Vite's, Tailwind v4's) lowers light-dark() to variables it sets only where the
+ * same stylesheet declares color-scheme, so a pair here breaks in an app's build. A dark page sets its own.
+ */
+:where(:root) {
+    --range-picker-text-color: #1c2130;
+    --range-picker-muted-color: #687086;
+    --range-picker-background: #fff;
+    --range-picker-hover-background: #f4f6fb;
+    --range-picker-border-color: #e6e8ef;
+    --range-picker-control-border-color: #cfd4df;
+    --range-picker-accent-color: #3d5afe;
+    --range-picker-accent-hover-color: #2f48d4;
+    --range-picker-on-accent-color: #fff;
+    --range-picker-selected-background: #eef1ff;
+    --range-picker-band-color: #2f48d4;
+    --range-picker-disabled-color: #aeb5c6;
+    --range-picker-radius: 0.75rem;
+    --range-picker-control-radius: 0.5rem;
+    --range-picker-shadow: 0 16px 40px -8px rgb(16 24 40 / 0.22);
+    --range-picker-font-size: 0.875rem;
+    --range-picker-padding: 1.25rem;
+    --range-picker-window-gap: 0.75rem;
+    --range-picker-offset: 0.375rem;
+    --range-picker-day-size: 2.5rem;
+    --range-picker-preset-height: 2.5rem;
+    --range-picker-position-try-order: most-height;
+}
+
+/* The button: the app draws the control; this lays out its icon, name and days. */
+.range-picker-button {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    inline-size: 100%;
+    text-align: start;
+    /* ponytail: one name per page, so a second picker anchors to the last button; anchor-scope if a page needs two. */
+    anchor-name: --range-picker;
+}
+
+/* Its popover is a later sibling: the button's parent holds both. */
+.range-picker-button:has(~ [data-range-picker]:popover-open) {
+    border-color: var(--range-picker-accent-color);
+    background-color: var(--range-picker-hover-background);
+}
+
+.range-picker-button > [data-range-name] {
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.range-picker-button > [data-range-dates] {
+    min-inline-size: 0;
+    overflow: hidden;
+    color: var(--range-picker-muted-color);
+    font-size: 0.8125rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* A custom range's button names its days alone. */
+.range-picker-button[data-range-state="custom"] > [data-range-dates] {
+    color: var(--range-picker-text-color);
+    font-size: inherit;
+    font-weight: 600;
+}
+
+/* The words for each data-range-state, in the app's markup. */
+[data-range-state] .when-pending,
+[data-range-state="custom"] .when-preset,
+[data-range-state="pending"] .when-preset,
+[data-range-state="custom"] > [data-range-name] {
+    display: none;
+}
+
+[data-range-state="pending"] .when-pending {
+    display: inline;
+}
+
+/*
+ * The popover, never given a display (that would show it closed): centred, as the browser places one, and under its
+ * button on a wide window (below). margin: auto puts back the browser's centring, which a reset zeroes.
+ */
+[data-range-picker] {
+    margin: auto;
+    width: max-content;
+    max-width: calc(100vw - 2 * var(--range-picker-window-gap));
+    max-height: calc(100dvh - 2 * var(--range-picker-window-gap));
+    padding: var(--range-picker-padding);
+    border: 1px solid var(--range-picker-border-color);
+    border-radius: var(--range-picker-radius);
+    background: var(--range-picker-background);
+    box-shadow: var(--range-picker-shadow);
+    color: var(--range-picker-text-color);
+    font-size: var(--range-picker-font-size);
+}
+
+.range-picker-panel {
+    display: grid;
+    grid-template-columns: 12rem auto;
+    gap: 0 1.5rem;
+}
+
+.range-picker-presets {
+    display: grid;
+    align-content: start;
+    gap: 2px;
+    padding-inline-end: 1.25rem;
+    border-inline-end: 1px solid var(--range-picker-rule-color, var(--range-picker-border-color));
+}
+
+.range-picker-preset {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    min-block-size: var(--range-picker-preset-height);
+    margin: 0;
+    padding-inline: 0.75rem;
+    border-radius: var(--range-picker-control-radius);
+    color: var(--range-picker-preset-color, var(--range-picker-muted-color));
+    font-weight: 500;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.range-picker-preset:hover {
+    background: var(--range-picker-preset-hover-background, var(--range-picker-hover-background));
+    color: var(--range-picker-preset-hover-color, var(--range-picker-text-color));
+}
+
+.range-picker-preset input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.range-picker-preset:has(:focus-visible) {
+    outline: 2px solid var(--range-picker-accent-color);
+    outline-offset: -2px;
+}
+
+/*
+ * The picked preset; while only the start day is picked, Custom range, which the calendar is making, though the checked
+ * radio stays the range the form sends.
+ */
+[data-range-picker]:not([data-range-state="pending"]) .range-picker-preset:has(:checked),
+[data-range-picker][data-range-state="pending"] .range-picker-preset:has([data-range-custom]) {
+    background: var(--range-picker-selected-background);
+    color: var(--range-picker-accent-color);
+    font-weight: 600;
+}
+
+/*
+ * Cally's parts, styled from outside: square ends joined by a tinted band, today in bold, and focus an outline only
+ * (its accent, which fills a focused day, made transparent).
+ */
+[data-range-picker] calendar-range {
+    display: block;
+}
+
+[data-range-picker] calendar-range::part(container) {
+    gap: 0.75rem;
+}
+
+[data-range-picker] calendar-range::part(button) {
+    display: grid;
+    place-items: center;
+    inline-size: 2.25rem;
+    block-size: 2.25rem;
+    border: 1px solid var(--range-picker-control-border-color);
+    border-radius: var(--range-picker-control-radius);
+    background: var(--range-picker-background);
+    color: var(--range-picker-arrow-color, var(--range-picker-muted-color));
+    cursor: pointer;
+}
+
+[data-range-picker] calendar-range::part(button):hover {
+    background: var(--range-picker-hover-background);
+    color: var(--range-picker-arrow-hover-color, var(--range-picker-text-color));
+}
+
+[data-range-picker] calendar-range::part(button):focus-visible {
+    outline: 2px solid var(--range-picker-accent-color);
+    outline-offset: 2px;
+}
+
+[data-range-picker] calendar-range::part(disabled) {
+    opacity: 0.35;
+    cursor: default;
+}
+
+/* Read out, not shown: the year select's label slot. */
+[data-range-picker] calendar-select-year::part(label) {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+}
+
+[data-range-picker] calendar-select-year::part(select) {
+    block-size: 2.25rem;
+    padding: 0 0.625rem;
+    border: 1px solid var(--range-picker-control-border-color);
+    border-radius: var(--range-picker-control-radius);
+    background: var(--range-picker-background);
+    color: var(--range-picker-text-color);
+    font: inherit;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+[data-range-picker] calendar-select-year::part(select):hover {
+    background: var(--range-picker-hover-background);
+}
+
+[data-range-picker] calendar-select-year::part(select):focus-visible {
+    outline: 2px solid var(--range-picker-accent-color);
+    outline-offset: 2px;
+}
+
+[data-range-picker] calendar-month {
+    --color-accent: transparent;
+    --color-text-on-accent: var(--range-picker-accent-color);
+}
+
+[data-range-picker] calendar-month::part(heading) {
+    margin-bottom: 0.25rem;
+    color: var(--range-picker-text-color);
+    font-weight: 600;
+}
+
+[data-range-picker] calendar-month::part(th) {
+    inline-size: var(--range-picker-day-size);
+    block-size: 1.75rem;
+    color: var(--range-picker-weekday-color, var(--range-picker-muted-color));
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+[data-range-picker] calendar-month::part(day) {
+    inline-size: var(--range-picker-day-size);
+    block-size: var(--range-picker-day-size);
+    border-radius: var(--range-picker-control-radius);
+    color: var(--range-picker-text-color);
+}
+
+[data-range-picker] calendar-month::part(day):hover {
+    background: var(--range-picker-hover-background);
+}
+
+[data-range-picker] calendar-month::part(day):focus-visible {
+    outline: 2px solid var(--range-picker-accent-color);
+    outline-offset: -2px;
+}
+
+[data-range-picker] calendar-month::part(today) {
+    color: var(--range-picker-accent-color);
+    font-weight: 700;
+}
+
+[data-range-picker] calendar-month::part(range-inner) {
+    border-radius: 0;
+    background: var(--range-picker-band-background, var(--range-picker-selected-background));
+    color: var(--range-picker-band-color);
+}
+
+[data-range-picker] calendar-month::part(range-start) {
+    border-start-end-radius: 0;
+    border-end-end-radius: 0;
+    background: var(--range-picker-accent-color);
+    color: var(--range-picker-on-accent-color);
+    font-weight: 700;
+}
+
+[data-range-picker] calendar-month::part(range-end) {
+    border-start-start-radius: 0;
+    border-end-start-radius: 0;
+    background: var(--range-picker-accent-color);
+    color: var(--range-picker-on-accent-color);
+    font-weight: 700;
+}
+
+[data-range-picker] calendar-month::part(range-start range-end) {
+    border-radius: var(--range-picker-control-radius);
+}
+
+/*
+ * A picked day keeps its own ground under the pointer: the day's hover, a pseudo-class heavier than a part, would lay
+ * the hover tint under the ends' text. A disabled picked day's rules below still win.
+ */
+[data-range-picker] calendar-month::part(range-inner):hover {
+    background: var(--range-picker-band-background, var(--range-picker-selected-background));
+}
+
+[data-range-picker] calendar-month::part(range-start):hover,
+[data-range-picker] calendar-month::part(range-end):hover {
+    background: var(--range-picker-accent-hover-color);
+}
+
+/*
+ * Out of the calendar's bounds: Cally disables those days, with no part of their own. Picked days before the first day
+ * (a preset wholly before it keeps its own days) are a grey range.
+ */
+[data-range-picker] calendar-month::part(disabled) {
+    color: var(--range-picker-disabled-color);
+}
+
+[data-range-picker] calendar-month::part(range-inner):disabled,
+[data-range-picker] calendar-month::part(range-start):disabled,
+[data-range-picker] calendar-month::part(range-end):disabled {
+    opacity: 1;
+    background: var(--range-picker-disabled-band-background, var(--range-picker-border-color));
+    color: var(--range-picker-disabled-band-color, var(--range-picker-muted-color));
+}
+
+[data-range-picker] calendar-month::part(range-start):disabled,
+[data-range-picker] calendar-month::part(range-end):disabled {
+    background: var(--range-picker-disabled-end-background, var(--range-picker-control-border-color));
+    color: var(--range-picker-disabled-end-color, var(--range-picker-text-color));
+}
+
+.range-picker-months {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 1.5rem 2rem;
+}
+
+.range-picker-foot {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem 1.25rem;
+    margin-top: 1.125rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--range-picker-rule-color, var(--range-picker-border-color));
+}
+
+.range-picker-summary {
+    margin: 0;
+    color: var(--range-picker-muted-color);
+}
+
+.range-picker-summary [data-range-name] {
+    color: var(--range-picker-text-color);
+    font-weight: 600;
+}
+
+.range-picker-pick-end {
+    color: var(--range-picker-accent-color);
+    font-weight: 600;
+}
+
+/* The presets as a row of chips over the calendar, where both don't fit beside it. */
+@media (width < 56rem) {
+    .range-picker-panel {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 1rem;
+    }
+
+    .range-picker-presets {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.375rem;
+        padding: 0 0 1rem;
+        border: 0;
+        border-bottom: 1px solid var(--range-picker-rule-color, var(--range-picker-border-color));
+    }
+
+    .range-picker-preset {
+        min-block-size: var(--range-picker-chip-height, var(--range-picker-preset-height));
+        border: 1px solid var(--range-picker-control-border-color);
+        border-radius: 999px;
+    }
+}
+
+/*
+ * Under its button on a wide window, opening toward the line's end, or flipped where that runs out of room. The gap at
+ * its far end keeps it off the window's edge: flip-inline swaps the inline margins with the side it opens toward, and
+ * where no placement fits the browser shifts the margin box, gap and all, back into the window.
+ */
+@media (width >= 64rem) {
+    @supports (position-area: bottom) {
+        [data-range-picker] {
+            inset: auto;
+            margin-block: var(--range-picker-offset);
+            margin-inline: 0 var(--range-picker-window-gap);
+            position-anchor: --range-picker;
+            position-area: bottom span-right;
+            position-try-fallbacks: flip-inline, flip-block, flip-block flip-inline;
+            /* No taller than the room on the side it opens toward, which is the roomier one by default: a short window
+               scrolls it inside, so its Set button stays reachable. */
+            max-height: var(--range-picker-anchored-max-height, calc(100% - 2 * var(--range-picker-offset)));
+            position-try-order: var(--range-picker-position-try-order);
+        }
+
+        [data-range-picker]:dir(rtl) {
+            position-area: bottom span-left;
+        }
+    }
+}

@@ -1,4 +1,5 @@
-import {closestTo, once} from './helpers.js';
+import {closestTo, isRadio, once} from './helpers.js';
+import {installSteps} from './steps.js';
 
 const COPY_FLASH_MS = 1500;
 
@@ -8,6 +9,9 @@ const SUBMITTING = 'data-submitting';
 
 /** closedby's light-dismiss value, polyfilled where the browser lacks it. */
 const CLOSED_BY_ANY = 'any';
+
+/** Between a radio's name and its value in data-show-if: "method=paypal". */
+const SHOW_IF_SEPARATOR = '=';
 
 const copyTimers = new WeakMap();
 
@@ -20,6 +24,7 @@ export const installUiBehaviours = once(() => {
     document.addEventListener('submit', submitOnce);
     window.addEventListener('pageshow', releaseSubmitted);
     document.addEventListener('change', checkAll);
+    document.addEventListener('change', switchOnPick);
     document.addEventListener('click', autoselect);
     document.addEventListener('click', copyOnClick);
     document.addEventListener('click', showModal);
@@ -27,6 +32,8 @@ export const installUiBehaviours = once(() => {
     document.addEventListener('pointerdown', pressBackdrop);
     document.addEventListener('click', closeOnBackdrop);
 
+    // First: a stepper dialog opened on load shows its step before showModal() moves focus in.
+    installSteps();
     openOnLoad();
 });
 
@@ -115,6 +122,39 @@ function checkAll({target}) {
             header.indeterminate = checked > 0 && checked < rows.length;
         }
     }
+}
+
+/**
+ * A radio picked shows its form's data-show-if="name=value" elements for its own value and hides those for another,
+ * and empties the fields marked data-clear-on="name", which belong to the value picked before.
+ */
+function switchOnPick({target}) {
+    if (!isRadio(target)) {
+        return;
+    }
+
+    const scope = target.form ?? document;
+
+    for (const element of scope.querySelectorAll('[data-show-if]')) {
+        const condition = showIfOf(element);
+
+        if (condition?.name === target.name) {
+            element.hidden = condition.value !== target.value;
+        }
+    }
+
+    for (const field of scope.querySelectorAll('[data-clear-on]')) {
+        if (field.dataset.clearOn === target.name) {
+            field.value = '';
+        }
+    }
+}
+
+function showIfOf(element) {
+    const condition = element.dataset.showIf;
+    const at = condition.indexOf(SHOW_IF_SEPARATOR);
+
+    return at > 0 ? {name: condition.slice(0, at), value: condition.slice(at + 1)} : null;
 }
 
 // Tabbing in selects a field's text natively; a click only places a caret.
