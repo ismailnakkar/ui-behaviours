@@ -246,10 +246,14 @@ opens nothing and the box shows in place, where its radios and fields still subm
 
         <input type="hidden" name="from" value="2026-11-14" data-range-from>
         <input type="hidden" name="to" value="2026-11-20" data-range-to>
-        <button>Show</button>
+        <button type="button" popovertarget="report-range" popovertargetaction="hide">Set</button>
     </div>
+
+    <button>Show</button>
 </form>
 ```
+
+Set only closes the popover, with the picks already in the fields: the form's own submit button runs it.
 
 - **`data-range-picker`** marks the box holding the rest, a `popover` here. Its buttons are the elements whose
   `popovertarget` names its id.
