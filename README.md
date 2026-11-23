@@ -494,10 +494,8 @@ any rule of yours wins; the ones defaulting to another property follow it.
 | `--range-picker-text-color` | `#1c2130` | The popover's text, the days, the month and year, the summary's range name, and a custom range's days on the button |
 | `--range-picker-muted-color` | `#687086` | The button's days and the summary |
 | `--range-picker-preset-color` | `--range-picker-muted-color` | The presets |
-| `--range-picker-preset-hover-color` | `--range-picker-text-color` | A preset under the pointer |
-| `--range-picker-preset-hover-background` | `--range-picker-hover-background` | Its ground |
+| `--range-picker-preset-hover-background` | `--range-picker-hover-background` | A preset under the pointer |
 | `--range-picker-arrow-color` | `--range-picker-muted-color` | Cally's previous and next buttons |
-| `--range-picker-arrow-hover-color` | `--range-picker-text-color` | An arrow under the pointer |
 | `--range-picker-weekday-color` | `--range-picker-muted-color` | The weekday names |
 | `--range-picker-background` | `#fff` | The popover, the arrows and the year select |
 | `--range-picker-hover-background` | `#f4f6fb` | A day, an arrow and the year select under the pointer, and the button while the popover is open |
@@ -517,19 +515,10 @@ any rule of yours wins; the ones defaulting to another property follow it.
 | `--range-picker-disabled-end-color` | `--range-picker-text-color` | Its text |
 | `--range-picker-radius` | `0.75rem` | The popover's corners |
 | `--range-picker-control-radius` | `0.5rem` | The presets', the days', the arrows' and the year select's corners |
-| `--range-picker-shadow` | `0 16px 40px -8px rgb(16 24 40 / 0.22)` | The popover's shadow |
-| `--range-picker-font-size` | `0.875rem` | The popover's text size |
 | `--range-picker-padding` | `1.25rem` | The popover's padding: set a smaller one under your phone width |
-| `--range-picker-window-gap` | `0.75rem` | The least room the popover leaves to the window's edges |
-| `--range-picker-offset` | `0.375rem` | The gap between the anchored popover and its button |
-| `--range-picker-anchored-max-height` | `calc(100% - 2 * var(--range-picker-offset))` | The anchored popover's height limit, against the room on the side it opens toward |
-| `--range-picker-position-try-order` | `most-height` | Which side the anchored popover prefers: the roomier one by default; `normal` keeps the order below, then above |
-| `--range-picker-day-size` | `2.5rem` | A day's width and height |
-| `--range-picker-preset-height` | `2.5rem` | A preset's least height |
-| `--range-picker-chip-height` | `--range-picker-preset-height` | A chip's least height, where the presets are chips |
 
-The weights and the text sizes are the stylesheet's, all from `--range-picker-font-size` but the year select (`1rem`),
-the button's days (`0.8125rem`) and the weekday names (`0.75rem`).
+The weights and the text sizes are the stylesheet's: the popover's text is `0.875rem`, the year select's `1rem`, the
+button's days `0.8125rem` and the weekday names `0.75rem`.
 
 The colours are light; a dark page sets its own under its dark selector. The stylesheet uses no `light-dark()`:
 Lightning CSS (in Vite and Tailwind v4) lowers it to variables it sets only where the same stylesheet declares
@@ -612,90 +601,24 @@ Run this package's suite with `npm test`.
 
 ## Upgrading
 
+### From 0.4
+
+- The stylesheet no longer reads `--range-picker-shadow`, `--range-picker-font-size`, `--range-picker-window-gap`,
+  `--range-picker-offset`, `--range-picker-anchored-max-height`, `--range-picker-position-try-order`,
+  `--range-picker-day-size`, `--range-picker-preset-height`, `--range-picker-chip-height`,
+  `--range-picker-preset-hover-color` or `--range-picker-arrow-hover-color`: it draws their old defaults. A page that
+  set one gets the default instead.
+
 ### From 0.3
 
 Nothing changes for a page on 0.3: copy buttons without `data-copy-status` and radios work as before, a select or a
 checkbox changes nothing unless a `data-show-if` names its field, and only a field marked `data-submit-on-change`
-submits. An app replacing its own copies changes these:
-
-- **cuty, the Full Page Script copy** (`resources/js/members/tools/fps.js`, `members/tools/fps.blade.php`). Delete the
-  `MutationObserver` at the end of `fps.js` with its `COPIED` and `status` constants, give the Copy button
-  `data-copy-status="fps-copy-status"`, and give the `.copy-status` span that id; its `data-copied-text` stays. Add a
-  `data-copy-failed-text` to say a refusal too.
-- **exe, both shorten forms' copy** (`resources/js/site/shorten.ts` and `shorten.test.ts`, the home page's form in
-  `public/home.blade.php` and the nav dialog's in `layouts/member.blade.php`: one `bind()` serves every
-  `form[data-shorten]`). In each form, give the `data-shorten-copy` button `data-copy` naming the form's link
-  (`shorten-link`, `shorten-dialog-link`) and `data-copy-status` naming its `data-shorten-status` paragraph, give that
-  paragraph the id (`shorten-status`, `shorten-dialog-status`), rename its `data-copied` to `data-copied-text`, and add
-  a `data-copy-failed-text` holding the `general.shorten.copy-blocked` words.
-  - Restyle each form from the button's own marks, as `x-ui.copy-button` does: the button becomes a `group`,
-    `group-data-[copy-state=done]:` becomes `data-copied:` on it (hover repeats included) and `group-data-copied:` on
-    its labels, `=failed` the same with `data-copy-failed`, and the copy-blocked line shows with
-    `group-has-[[data-copy-failed]]:block`.
-  - Delete the copy state machine from `shorten.ts`: the `CopyState` and `Timer` types, `copyState` and its calls, the
-    `copied` timer, `copyLink()` and the copy listener. Drop the `failed` hook and the `data-shorten-copy-failed`
-    attribute of both copy-blocked lines in the same change: `hooks()` binds nothing while a hook it asks for is
-    missing. `copy` and `copyUrl` stay: `showResult()` focuses the one and fills the other.
-  - In `shorten.test.ts`, drop `data-shorten-copy-failed` and `data-copied` from the markup, delete "selects the link
-    when the clipboard refuses" (this package's tests select a refused copy), and keep "clears a Copied state when a
-    new link arrives" as "shows a new link and says it is ready": its submit and answer, without the copy click and the
-    `copyState` assertions.
-  - Both marks then last 1.5 seconds, as on exe's other copy buttons. Today a copy shows for 2 seconds, a refusal and
-    its copy-blocked line stay until the next copy or submit, and a new link clears either at once.
-- **upfiles, the admin's conditional fields** (`resources/js/admin/conditional-fields.js`, its
-  `tests/js/conditional-fields.test.mjs`, the `initConditionalFields()` call in `resources/js/admin/index.js`). Delete
-  the three, and turn each `data-cond-field="x" data-cond-value="v"` into `data-show-if="x=v"`
-  (`admin/delete.blade.php`, `components/storages/form.blade.php`). The storages form now draws its first state on the
-  server: each role hint and driver section `hidden` unless it is the role or driver its select shows (`old()`, else the
-  storage's, else the default role or the first driver), as the CSAM origin field already is.
-- **upfiles, the auto-submitting select** (`resources/js/lib/form-affordances.js`, called from
-  `resources/js/admin/index.js` and `resources/js/member/index.js`). Delete it and its two calls, and rename
-  `data-autosubmit` to `data-submit-on-change` (`admin/moderation/index.blade.php`); both bundles already call
-  `installUiBehaviours()`. Rename it in the two `assertDontSee('data-autosubmit', false)` of
-  `tests/Feature/StatisticsDashboardsTest.php` too, or they pass whatever the month pickers carry.
-- **centratag, the dashboard's select** (`resources/js/dashboard.ts`). Add `@ismailnakkar/ui-behaviours` and replace the
-  file's change listener with `installUiBehaviours()`; `data-submit-on-change` in `tags/show.blade.php` stays as it is.
+submits.
 
 ### From 0.2
 
 Nothing changes for a page on 0.2: the stepper, `data-show-if` and `data-clear-on` read only attributes of their own,
-and the stylesheet loads only when imported. An app replacing its own copies changes these:
-
-- **The two-factor stepper.** Delete the app's stepper script, its steps module and their tests, then in the dialog:
-  - add `data-steps` to the dialog;
-  - replace `data-email-code-sent` with `data-open-at-step="2"`, the email step;
-  - rename `data-step-turn-on` to `data-step-submit` (`data-step`, `data-step-back` and `data-step-next` stay);
-  - on the progress bars, rename `data-progress-step="n"` to `data-step-mark="n"`, draw mark 1 with
-    `data-step-state="current"`, and style `[data-step-state="done"]` and `[data-step-state="current"]` in place of the
-    `is-done` and `is-current` classes (or `data-state`);
-  - on the progress line's spans, rename `data-progress-step="n"` to `data-step-label="n"`;
-  - give each field the server refused `aria-invalid="true"`: the stepper reads no error class (`.validation-error`,
-    `.invalid-feedback`).
-- **The payout destination form.** Delete the app's destination script, drop `data-destination-form`, add
-  `data-clear-on="method"` to the account field, and turn each `data-method-hint="paypal"` into
-  `data-show-if="method=paypal"`.
-- **The range picker's look.** Import `range-picker.css` and set the custom properties from the app's palette and
-  sizes, with a smaller `--range-picker-padding` under the app's phone width (`1rem` for a popover that had 16px). In
-  the markup, `r-range-button` becomes `range-picker-button`, `r-range-panel` `range-picker-panel`, `r-presets`
-  `range-picker-presets`, `r-preset` `range-picker-preset`, `r-months` `range-picker-months`, `r-range-foot`
-  `range-picker-foot`, `r-range-sum` `range-picker-summary` and `r-pick-end` `range-picker-pick-end`; `r-range`,
-  `r-calendar`, `r-range-name` and `r-range-dates` go, as the stylesheet styles `[data-range-picker]`, its
-  `calendar-range`, `[data-range-name]` and `[data-range-dates]`. Utility classes that restyle the popover (border,
-  background, padding, shadow, text colour) go too; an opening animation stays.
-
-  Then delete the app's own picker rules, except those that draw the app's controls and icons, which the stylesheet
-  leaves to the app. Keep these, under the new class names:
-  - the range button's control: its height, padding, border, corners, background, text colour and size, hover and
-    transition, its icons' size and colour, and the chevron's `margin-inline-start: auto` (cuty's `.r-range-button`
-    and its desktop font size, upfiles' `.r-range-button > i`; exe draws it with utility classes);
-  - the arrows' icons in Cally's slots, both nested in `.r-calendar`, so move them out before deleting that block:
-    their size (cuty's `[slot] > svg`, as `[data-range-picker] [slot] > svg`) and their mirror on a right-to-left
-    page (upfiles' `.r-flip:dir(rtl)`; cuty's `flip-rtl` and exe's `rtl:-scale-x-100` sit outside the picker's
-    rules);
-  - a preset's icon size (cuty's `.r-preset svg`);
-  - the Set button: cuty's `.r-range-foot button` (height, padding, size, weight), and its full width on a phone,
-    cuty's `.r-range-foot button { flex: 1 }` and upfiles' `.r-range-foot .btn` (exe's `max-sm:flex-1` is in the
-    markup).
+and the stylesheet loads only when imported.
 
 ### From 0.1
 
