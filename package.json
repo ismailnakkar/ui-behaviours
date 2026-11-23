@@ -1,7 +1,7 @@
 {
     "name": "@ismailnakkar/ui-behaviours",
-    "version": "0.3.0",
-    "description": "Page behaviours from plain HTML attributes (copy, confirm, submit once, native dialogs, steps, show by a radio, check all, autoselect), and a date range picker over Cally with an optional stylesheet.",
+    "version": "0.4.0",
+    "description": "Page behaviours from plain HTML attributes (copy with a spoken result, confirm, submit once or on a change, native dialogs, steps, show by a radio, checkbox or select, check all, autoselect), and a date range picker over Cally with an optional stylesheet.",
     "keywords": [
         "clipboard",
         "dialog",

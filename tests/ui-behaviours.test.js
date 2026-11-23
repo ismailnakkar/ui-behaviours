@@ -374,6 +374,89 @@ describe('data-copy', () => {
     });
 });
 
+function renderCopyStatus() {
+    vi.useFakeTimers();
+    document.body.innerHTML = `
+        <input id="short-url" type="text" value="https://exe.io/abcd" readonly>
+        <button type="button" data-copy="short-url" data-copy-status="copy-status">Copy</button>
+        <p id="copy-status" role="status" data-copied-text="Link copied" data-copy-failed-text="Copy blocked: copy the selected link by hand"></p>`;
+
+    return {
+        button: document.querySelector('button'),
+        status: document.querySelector('[role="status"]'),
+    };
+}
+
+describe('data-copy-status', () => {
+    it('says the copy in its live region while the button is marked, emptied at the click so a second copy is said again', async () => {
+        const {button, status} = renderCopyStatus();
+        vi.spyOn(navigator.clipboard, 'writeText').mockResolvedValue(undefined);
+
+        await copyWith(button);
+        expect(status.textContent).toBe('Link copied');
+
+        button.click();
+        expect(status.textContent).toBe('');
+
+        await vi.advanceTimersByTimeAsync(0);
+        expect(status.textContent).toBe('Link copied');
+
+        await vi.advanceTimersByTimeAsync(1_500);
+        expect(button.hasAttribute('data-copied')).toBe(false);
+        expect(status.textContent).toBe('');
+    });
+
+    it('says a refusal in the region\'s words for it, and nothing for a result it has no words for', async () => {
+        const {button, status} = renderCopyStatus();
+        const write = vi.spyOn(navigator.clipboard, 'writeText').mockRejectedValue(refused());
+
+        await copyWith(button);
+        expect(status.textContent).toBe('Copy blocked: copy the selected link by hand');
+
+        delete status.dataset.copiedText;
+        write.mockResolvedValue(undefined);
+        await copyWith(button);
+        expect(status.textContent).toBe('');
+    });
+
+    it('leaves words the page wrote in the region since', async () => {
+        const {button, status} = renderCopyStatus();
+        vi.spyOn(navigator.clipboard, 'writeText').mockResolvedValue(undefined);
+
+        await copyWith(button);
+        expect(status.textContent).toBe('Link copied');
+
+        status.textContent = 'Your short link is ready';
+        await vi.advanceTimersByTimeAsync(1_500);
+        expect(status.textContent).toBe('Your short link is ready');
+    });
+});
+
+describe('data-submit-on-change', () => {
+    it('sends the form of a select or a box it marks, through the form\'s submit event', () => {
+        document.body.innerHTML = `
+            <form>
+                <select name="sort" data-submit-on-change>
+                    <option value="newest">Newest</option>
+                    <option value="oldest">Oldest</option>
+                </select>
+                <input type="checkbox" name="mine" value="1" data-submit-on-change>
+                <input name="q">
+            </form>`;
+        const sent = vi.fn((event) => event.preventDefault());
+        document.querySelector('form').addEventListener('submit', sent);
+
+        change(document.querySelector('select'));
+        expect(sent).toHaveBeenCalledOnce();
+
+        document.querySelector('[name="mine"]').click();
+        expect(sent).toHaveBeenCalledTimes(2);
+
+        change(document.querySelector('[name="q"]'));
+        expect(sent).toHaveBeenCalledTimes(2);
+    });
+});
+
 describe('copyText', () => {
     it('answers whether the clipboard took the text', async () => {
         const write = vi.spyOn(navigator.clipboard, 'writeText').mockResolvedValue(undefined);

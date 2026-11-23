@@ -147,6 +147,10 @@ describe('data-steps', () => {
     });
 });
 
+const showing = () => [...document.querySelectorAll('[data-show-if]')].filter((element) => !element.hidden).map((element) => element.dataset.showIf);
+
+const change = (selector) => $(selector).dispatchEvent(new Event('change', {bubbles: true}));
+
 describe('data-show-if and data-clear-on', () => {
     beforeEach(() => {
         document.body.innerHTML = `
@@ -162,8 +166,6 @@ describe('data-show-if and data-clear-on', () => {
                 <p data-show-if="network=polygon" hidden>Polygon only.</p>
             </form>`;
     });
-
-    const showing = () => [...document.querySelectorAll('[data-show-if]')].filter((element) => !element.hidden).map((element) => element.dataset.showIf);
 
     it('shows the picked value\'s elements and empties the fields of the value picked before, on every pick', () => {
         click('[value="usdt_polygon"]');
@@ -186,7 +188,7 @@ describe('data-show-if and data-clear-on', () => {
     });
 
     it('leaves the form alone when another field changes', () => {
-        $('[name="full_name"]').dispatchEvent(new Event('change', {bubbles: true}));
+        change('[name="full_name"]');
 
         expect($('[name="account"]').value).toBe('payee@example.com');
         expect(showing()).toEqual(['method=paypal']);
@@ -202,5 +204,71 @@ describe('data-show-if and data-clear-on', () => {
         click('form:not(#other) [value="usdt_polygon"]');
 
         expect($('#other [name="account"]').value).toBe('kept');
+    });
+});
+
+describe('data-show-if on a select or a checkbox', () => {
+    beforeEach(() => {
+        document.body.innerHTML = `
+            <form>
+                <select name="driver">
+                    <option value="local" selected>Local</option>
+                    <option value="s3">S3</option>
+                </select>
+                <div data-show-if="driver=local">The local root.</div>
+                <div data-show-if="driver=s3" hidden>The bucket.</div>
+
+                <input type="checkbox" name="csam" value="1">
+                <div data-show-if="csam=1" hidden>How was this reported to us?</div>
+
+                <input type="checkbox" name="notify[]" value="email">
+                <input type="checkbox" name="notify[]" value="sms">
+                <p data-show-if="notify[]=sms" hidden>Your phone number.</p>
+            </form>`;
+    });
+
+    it('shows the selected option\'s elements and hides the others\'', () => {
+        $('[name="driver"]').value = 's3';
+        change('[name="driver"]');
+
+        expect(showing()).toEqual(['driver=s3']);
+
+        $('[name="driver"]').value = 'local';
+        change('[name="driver"]');
+
+        expect(showing()).toEqual(['driver=local']);
+    });
+
+    it('shows each option a multiple select holds', () => {
+        $('[name="driver"]').multiple = true;
+
+        for (const option of $('[name="driver"]').options) {
+            option.selected = true;
+        }
+
+        change('[name="driver"]');
+
+        expect(showing()).toEqual(['driver=local', 'driver=s3']);
+    });
+
+    it('shows a box\'s elements while it is ticked', () => {
+        click('[name="csam"]');
+
+        expect(showing()).toEqual(['driver=local', 'csam=1']);
+
+        click('[name="csam"]');
+
+        expect(showing()).toEqual(['driver=local']);
+    });
+
+    it('leaves the elements of another box of the same name alone', () => {
+        click('[value="sms"]');
+        click('[value="email"]');
+
+        expect(showing()).toEqual(['driver=local', 'notify[]=sms']);
+
+        click('[value="email"]');
+
+        expect(showing()).toEqual(['driver=local', 'notify[]=sms']);
     });
 });

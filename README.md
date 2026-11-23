@@ -1,8 +1,9 @@
 # @ismailnakkar/ui-behaviours
 
-Page behaviours from plain HTML attributes: copy to the clipboard, confirm a submit, send a form once, open, close and
-light-dismiss a native `<dialog>`, walk a form's steps one at a time, show a radio's own hints, check every row from a
-header box, and select a field's text on a click. They listen on the document, so markup added later works too.
+Page behaviours from plain HTML attributes: copy to the clipboard and say the result to screen readers, confirm
+a submit, send a form once, send a form on a change, open, close and light-dismiss a native `<dialog>`, walk a form's
+steps one at a time, show what a radio, a checkbox or a select chose, check every row from a header box, and select a
+field's text on a click. They listen on the document, so markup added later works too.
 
 A date range picker over [Cally](https://wicky.nillia.ms/cally/) has its own entry, so pages without one never load the
 calendar, and an optional stylesheet themed by custom properties. Nothing else ships styles, and nothing ships wording:
@@ -35,14 +36,16 @@ Then mark up the page:
 |---|---|---|
 | [`data-copy="id"`](#data-copyid) | a button | copies the element with that id |
 | [`data-copy-value`](#data-copyid) | the copied element | the text to copy instead of what it shows |
+| [`data-copy-status="id"`](#data-copy-statusid) | a copy button | says the result in the live region with that id |
 | [`data-confirm="question"`](#data-confirmquestion) | a form or a submit button | asks before submitting |
 | [`data-submit-once`](#data-submit-once) | a form | refuses a second submit |
+| [`data-submit-on-change`](#data-submit-on-change) | a select, a checkbox or a radio in a form | submits the form when it changes |
 | [`data-show-modal="id"`](#data-show-modalid) | a button or a link | opens the dialog with that id as a modal |
 | [`data-close-modal`](#data-close-modal) | a button in a dialog | closes that dialog |
 | [`closedby="any"`](#closedbyany) | a dialog | closes it on a backdrop click |
 | [`data-open-on-load`](#data-open-on-load) | a dialog | opens it on install |
 | [`data-steps`](#data-steps) | a dialog or any box | shows its `data-step` sections one at a time |
-| [`data-show-if="name=value"`](#data-show-ifnamevalue-and-data-clear-onname) | any element in a form | shows it only while the radio `name` has that value |
+| [`data-show-if="name=value"`](#data-show-ifnamevalue-and-data-clear-onname) | any element in a form | shows it only while the radio, checkbox or select `name` holds that value |
 | [`data-clear-on="name"`](#data-show-ifnamevalue-and-data-clear-onname) | a field in a form | empties it when another radio `name` is picked |
 | [`data-check-all="name"`](#data-check-allname) | a header checkbox | checks every row named `name` |
 | [`data-autoselect`](#data-autoselect) | an input or a textarea | selects its text on a click |
@@ -70,6 +73,26 @@ focused too, so the user copies it by hand. A missing source copies nothing.
 To refuse a copy (asking for a missing field first), call `event.preventDefault()` in a click listener of your own on
 the button or an element around it: the copy skips a cancelled click.
 
+### `data-copy-status="id"`
+
+On a copy button: names a live region (`role="status"`) that says the result, as the button's own marks are not read
+out. The region holds the words: its `data-copied-text` for a copy that worked, its `data-copy-failed-text` for a
+refusal; a result it has no words for says nothing.
+
+```html
+<input id="short-url" value="https://example.com/abcd" readonly data-autoselect>
+<button type="button" data-copy="short-url" data-copy-status="short-url-status">
+    <span>Copy</span><span>Copied</span>
+</button>
+<p id="short-url-status" role="status" class="sr-only"
+   data-copied-text="Link copied" data-copy-failed-text="Copy blocked: copy the selected link by hand"></p>
+```
+
+The click empties the region, so the same words said again are read out again; the words go in once the clipboard
+answers and leave with the button's marks, 1.5 seconds later, unless the page has written something else there since.
+Buttons may share one region, and the page may use it for its own news too. Keep the region in place, never `hidden`:
+a hidden element is out of the accessibility tree, and one that appears as it speaks is not reliably read.
+
 ### `data-confirm="question"`
 
 On a form, or on one of its submit buttons: the browser's `confirm()` asks that question, and only a yes submits. The
@@ -94,6 +117,20 @@ forms send again.
 <form method="POST" action="/subscription" data-submit-once>
     <button name="gateway" value="stripe">Pay by card</button>
     <button name="gateway" value="balance">Pay with balance</button>
+</form>
+```
+
+### `data-submit-on-change`
+
+On a select, a checkbox or a radio in a form: a change submits the form with `requestSubmit()`, as its submit button
+would, so the browser checks the fields and `data-confirm` and `data-submit-once` apply. A field in no form sends
+nothing. Mark only choices whose result the label makes plain, such as a sort or a filter.
+
+```html
+<form method="GET" action="/admin/reports">
+    <label for="sort">Sort by</label>
+    <select id="sort" name="sort" data-submit-on-change>…</select>
+    <noscript><button>Sort</button></noscript>
 </form>
 ```
 
@@ -208,9 +245,16 @@ before the script runs. A stepper added later works, but opens at nothing.
 
 ### `data-show-if="name=value"` and `data-clear-on="name"`
 
-In a form, for a choice made with radios: picking a radio named `name` shows the form's elements whose `data-show-if`
-names that radio's value and hides those naming another, and empties the fields marked `data-clear-on="name"`, which
-belonged to the value picked before. A payout destination is one: the account depends on the method.
+In a form, for a choice: an element marked `data-show-if="name=value"` shows while the field named `name` holds that
+value, and hides once it does not.
+
+- **A radio**: picking one shows the elements naming its value and hides those naming another.
+- **A checkbox**: ticking the box with that value shows them, unticking it hides them, and another box of the same name
+  leaves them alone. A box without a `value` has the value `on`.
+- **A select**: a change shows the elements naming a selected option's value and hides the rest.
+
+Picking a radio named `name` also empties the fields marked `data-clear-on="name"`, which belonged to the value picked
+before. A payout destination is one: the account depends on the method.
 
 ```html
 <form method="POST" action="/withdrawals/destination">
@@ -225,8 +269,21 @@ belonged to the value picked before. A payout destination is one: the account de
 </form>
 ```
 
-The server draws the checked radio's elements shown and the others `hidden`; the script changes them on a pick only. It
-reads radios only, within the picked radio's form (the page, for a radio in no form).
+```html
+<select name="driver">
+    <option value="local" selected>Local disk</option>
+    <option value="s3">S3</option>
+</select>
+<fieldset data-show-if="driver=s3" hidden>…</fieldset>
+
+<label><input type="checkbox" name="report" value="1"> Report it</label>
+<div data-show-if="report=1" hidden>…</div>
+```
+
+The server draws the chosen value's elements shown and the others `hidden`, a refused submit's page from the values
+sent back; the script changes them on a change only. It reads within the changed field's form (the page, for a field in
+no form). A hidden element's fields still submit, and a hidden `required` one blocks the submit: leave `required` off
+them and let the server require each for its own value.
 
 ### `data-check-all="name"`
 
@@ -287,8 +344,11 @@ The package sets attributes and the browser's own states; the app styles them:
   and focus goes back to the opener on close. Give each one an `aria-labelledby`.
 - Put the copy state in the button's text (two spans, one hidden), so it never relies on colour alone.
 - A refused copy selects and focuses the field, so the user can copy it with the keyboard.
-- The copy marks change an attribute only, so screen readers announce nothing. A page that needs it adds a
-  `role="status"` line and fills it when `data-copied` appears (a `MutationObserver`).
+- The copy marks change an attribute only, which screen readers do not read out: give the button a
+  [`data-copy-status`](#data-copy-statusid) region with the words for both results, so the result is heard.
+- A change that submits moves the page under the user, and on some desktop browsers an arrow key on a closed select
+  changes it at once: keep `data-submit-on-change` to a sort or a filter that is cheap to redo, and give the form a
+  submit button for a page without script.
 - A stepper moves focus to the new step's heading, so a screen reader starts where the step does: give each a
   `tabindex="-1"`. Hide the progress marks (`aria-hidden="true"`) and put the step's words in a `data-step-label` inside
   an `aria-live="polite"` region.
@@ -521,9 +581,9 @@ if (!(await copyText(url))) {
 
 ## Events
 
-The package fires none of its own. A dialog's native `close` fires when a close button or the backdrop closes it, and
-the range picker's radios fire the native `change`. Cally's `change` and `rangestart` do not bubble: listen to them in
-the capture phase, as the package does.
+The package fires none of its own. A dialog's native `close` fires when a close button or the backdrop closes it, the
+range picker's radios fire the native `change`, and a `data-submit-on-change` field's form the native `submit`. Cally's
+`change` and `rangestart` do not bubble: listen to them in the capture phase, as the package does.
 
 ## Testing
 
@@ -551,6 +611,50 @@ test one opening on load, put its markup in place before installing, in a test f
 Run this package's suite with `npm test`.
 
 ## Upgrading
+
+### From 0.3
+
+Nothing changes for a page on 0.3: copy buttons without `data-copy-status` and radios work as before, a select or a
+checkbox changes nothing unless a `data-show-if` names its field, and only a field marked `data-submit-on-change`
+submits. An app replacing its own copies changes these:
+
+- **cuty, the Full Page Script copy** (`resources/js/members/tools/fps.js`, `members/tools/fps.blade.php`). Delete the
+  `MutationObserver` at the end of `fps.js` with its `COPIED` and `status` constants, give the Copy button
+  `data-copy-status="fps-copy-status"`, and give the `.copy-status` span that id; its `data-copied-text` stays. Add a
+  `data-copy-failed-text` to say a refusal too.
+- **exe, both shorten forms' copy** (`resources/js/site/shorten.ts` and `shorten.test.ts`, the home page's form in
+  `public/home.blade.php` and the nav dialog's in `layouts/member.blade.php`: one `bind()` serves every
+  `form[data-shorten]`). In each form, give the `data-shorten-copy` button `data-copy` naming the form's link
+  (`shorten-link`, `shorten-dialog-link`) and `data-copy-status` naming its `data-shorten-status` paragraph, give that
+  paragraph the id (`shorten-status`, `shorten-dialog-status`), rename its `data-copied` to `data-copied-text`, and add
+  a `data-copy-failed-text` holding the `general.shorten.copy-blocked` words.
+  - Restyle each form from the button's own marks, as `x-ui.copy-button` does: the button becomes a `group`,
+    `group-data-[copy-state=done]:` becomes `data-copied:` on it (hover repeats included) and `group-data-copied:` on
+    its labels, `=failed` the same with `data-copy-failed`, and the copy-blocked line shows with
+    `group-has-[[data-copy-failed]]:block`.
+  - Delete the copy state machine from `shorten.ts`: the `CopyState` and `Timer` types, `copyState` and its calls, the
+    `copied` timer, `copyLink()` and the copy listener. Drop the `failed` hook and the `data-shorten-copy-failed`
+    attribute of both copy-blocked lines in the same change: `hooks()` binds nothing while a hook it asks for is
+    missing. `copy` and `copyUrl` stay: `showResult()` focuses the one and fills the other.
+  - In `shorten.test.ts`, drop `data-shorten-copy-failed` and `data-copied` from the markup, delete "selects the link
+    when the clipboard refuses" (this package's tests select a refused copy), and keep "clears a Copied state when a
+    new link arrives" as "shows a new link and says it is ready": its submit and answer, without the copy click and the
+    `copyState` assertions.
+  - Both marks then last 1.5 seconds, as on exe's other copy buttons. Today a copy shows for 2 seconds, a refusal and
+    its copy-blocked line stay until the next copy or submit, and a new link clears either at once.
+- **upfiles, the admin's conditional fields** (`resources/js/admin/conditional-fields.js`, its
+  `tests/js/conditional-fields.test.mjs`, the `initConditionalFields()` call in `resources/js/admin/index.js`). Delete
+  the three, and turn each `data-cond-field="x" data-cond-value="v"` into `data-show-if="x=v"`
+  (`admin/delete.blade.php`, `components/storages/form.blade.php`). The storages form now draws its first state on the
+  server: each role hint and driver section `hidden` unless it is the role or driver its select shows (`old()`, else the
+  storage's, else the default role or the first driver), as the CSAM origin field already is.
+- **upfiles, the auto-submitting select** (`resources/js/lib/form-affordances.js`, called from
+  `resources/js/admin/index.js` and `resources/js/member/index.js`). Delete it and its two calls, and rename
+  `data-autosubmit` to `data-submit-on-change` (`admin/moderation/index.blade.php`); both bundles already call
+  `installUiBehaviours()`. Rename it in the two `assertDontSee('data-autosubmit', false)` of
+  `tests/Feature/StatisticsDashboardsTest.php` too, or they pass whatever the month pickers carry.
+- **centratag, the dashboard's select** (`resources/js/dashboard.ts`). Add `@ismailnakkar/ui-behaviours` and replace the
+  file's change listener with `installUiBehaviours()`; `data-submit-on-change` in `tags/show.blade.php` stays as it is.
 
 ### From 0.2
 

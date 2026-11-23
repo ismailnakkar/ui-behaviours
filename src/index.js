@@ -1,4 +1,4 @@
-import {closestTo, isRadio, once} from './helpers.js';
+import {closestTo, isCheckbox, isRadio, once} from './helpers.js';
 import {installSteps} from './steps.js';
 
 const COPY_FLASH_MS = 1500;
@@ -10,7 +10,7 @@ const SUBMITTING = 'data-submitting';
 /** closedby's light-dismiss value, polyfilled where the browser lacks it. */
 const CLOSED_BY_ANY = 'any';
 
-/** Between a radio's name and its value in data-show-if: "method=paypal". */
+/** Between a field's name and its value in data-show-if: "method=paypal". */
 const SHOW_IF_SEPARATOR = '=';
 
 const copyTimers = new WeakMap();
@@ -24,7 +24,10 @@ export const installUiBehaviours = once(() => {
     document.addEventListener('submit', submitOnce);
     window.addEventListener('pageshow', releaseSubmitted);
     document.addEventListener('change', checkAll);
-    document.addEventListener('change', switchOnPick);
+    document.addEventListener('change', showOnChange);
+    document.addEventListener('change', clearOnPick);
+    // Last: the form goes as the other behaviours leave it.
+    document.addEventListener('change', submitOnChange);
     document.addEventListener('click', autoselect);
     document.addEventListener('click', copyOnClick);
     document.addEventListener('click', showModal);
@@ -94,12 +97,19 @@ function releaseSubmitted({persisted}) {
     }
 }
 
+// requestSubmit(), not submit(): the browser checks the fields, and data-confirm and data-submit-once apply.
+function submitOnChange({target}) {
+    if (target instanceof Element && target.hasAttribute('data-submit-on-change')) {
+        target.form?.requestSubmit();
+    }
+}
+
 function checkboxesNamed(name) {
-    return [...document.getElementsByName(name)].filter((box) => box.type === 'checkbox' && !box.disabled);
+    return [...document.getElementsByName(name)].filter((box) => isCheckbox(box) && !box.disabled);
 }
 
 function checkAll({target}) {
-    if (!(target instanceof HTMLInputElement) || target.type !== 'checkbox') {
+    if (!isCheckbox(target)) {
         return;
     }
 
@@ -125,25 +135,42 @@ function checkAll({target}) {
 }
 
 /**
- * A radio picked shows its form's data-show-if="name=value" elements for its own value and hides those for another,
- * and empties the fields marked data-clear-on="name", which belong to the value picked before.
+ * A radio picked, a box ticked or a select changed shows its form's data-show-if="name=value" elements while it holds
+ * that value and hides them once it does not.
  */
-function switchOnPick({target}) {
+function showOnChange({target}) {
+    if (!isRadio(target) && !isCheckbox(target) && !(target instanceof HTMLSelectElement)) {
+        return;
+    }
+
+    for (const element of (target.form ?? document).querySelectorAll('[data-show-if]')) {
+        const condition = showIfOf(element);
+
+        if (condition?.name === target.name && speaksFor(target, condition.value)) {
+            element.hidden = !holds(target, condition.value);
+        }
+    }
+}
+
+/** A box speaks for its own value alone, as other boxes of its name keep theirs; a radio or select for every value. */
+function speaksFor(field, value) {
+    return !isCheckbox(field) || field.value === value;
+}
+
+// options, not selectedOptions: happy-dom's list goes stale after its first read, so app tests would see an old pick.
+function holds(field, value) {
+    return field instanceof HTMLSelectElement
+        ? [...field.options].some((option) => option.selected && option.value === value)
+        : field.checked && field.value === value;
+}
+
+/** A radio picked empties its form's fields marked data-clear-on="name", which belong to the value picked before. */
+function clearOnPick({target}) {
     if (!isRadio(target)) {
         return;
     }
 
-    const scope = target.form ?? document;
-
-    for (const element of scope.querySelectorAll('[data-show-if]')) {
-        const condition = showIfOf(element);
-
-        if (condition?.name === target.name) {
-            element.hidden = condition.value !== target.value;
-        }
-    }
-
-    for (const field of scope.querySelectorAll('[data-clear-on]')) {
+    for (const field of (target.form ?? document).querySelectorAll('[data-clear-on]')) {
         if (field.dataset.clearOn === target.name) {
             field.value = '';
         }
@@ -185,23 +212,42 @@ async function copyOnClick(event) {
         return;
     }
 
+    const status = button.dataset.copyStatus ? document.getElementById(button.dataset.copyStatus) : null;
+
+    // Emptied first, so the same words said again are read out again.
+    status?.replaceChildren();
+
     const copied = await copyText(copiedTextOf(source));
 
-    flashCopyResult(button, copied);
+    flashCopyResult(button, copied, status);
 
     if (!copied) {
         selectForManualCopy(source);
     }
 }
 
-function flashCopyResult(button, copied) {
+function flashCopyResult(button, copied, status) {
+    const said = status ? sayCopyResult(status, copied) : null;
+
     clearTimeout(copyTimers.get(button));
     button.toggleAttribute(COPIED, copied);
     button.toggleAttribute(COPY_FAILED, !copied);
     copyTimers.set(button, setTimeout(() => {
         button.removeAttribute(COPIED);
         button.removeAttribute(COPY_FAILED);
+
+        // Its own words only: the page may have said something else there since.
+        if (status?.textContent === said) {
+            status.textContent = '';
+        }
     }, COPY_FLASH_MS));
+}
+
+/** Writes the live region's words for the result, its data-copied-text or data-copy-failed-text, and returns them. */
+function sayCopyResult(status, copied) {
+    status.textContent = (copied ? status.dataset.copiedText : status.dataset.copyFailedText) ?? '';
+
+    return status.textContent;
 }
 
 // select() alone may leave the field unfocused; focused, Ctrl/Cmd+C copies it by hand.

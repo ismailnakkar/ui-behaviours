@@ -18,3 +18,7 @@ export function closestTo({target}, selector) {
 export function isRadio(element) {
     return element instanceof HTMLInputElement && element.type === 'radio';
 }
+
+export function isCheckbox(element) {
+    return element instanceof HTMLInputElement && element.type === 'checkbox';
+}
