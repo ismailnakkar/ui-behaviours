@@ -2,6 +2,8 @@ import {closestTo} from './helpers.js';
 
 const STEPPER = '[data-steps]';
 const STEP = '[data-step]';
+const MARK = '[data-step-mark]';
+const PROGRESS = '[data-step-progress]';
 const FIELDS = 'input, select, textarea';
 const HEADING = 'h1, h2, h3, h4, h5, h6';
 const BACK = '[data-step-back]';
@@ -9,8 +11,11 @@ const NEXT = '[data-step-next]';
 const SUBMIT = '[data-step-submit]';
 const MARK_STATE = 'data-step-state';
 
-/** Steps are numbered from 1, in the order they come. */
-const FIRST_STEP = 1;
+/** Steps go by their place in the markup: the first is 0 here, and 1 in data-step-progress's wording. */
+const FIRST_STEP = 0;
+
+/** data-step-progress's placeholders, as Laravel's __() leaves them when given none: the showing step's place and the count. */
+const PROGRESS_PLACEHOLDER = /:(steps|step)\b/g;
 
 /** The values of data-step-state on a progress mark: the steps behind are done, the one showing is current. */
 const MarkState = Object.freeze({done: 'done', current: 'current'});
@@ -60,8 +65,8 @@ function stepOnEnter(event) {
 
 /**
  * A refused submit comes back with its errors in the stepper: it opens at the earliest step with a refused or an empty
- * field, as a field the server never hands back (a mailed code) is empty again. Otherwise at data-open-at-step, or
- * shut at the step it shows.
+ * field, as a field the server never hands back (a mailed code) is empty again. Otherwise at the step
+ * data-open-at-step names, or shut at the step it shows.
  */
 function openStepper(stepper) {
     const opening = openingStepOf(stepper);
@@ -77,12 +82,14 @@ function openingStepOf(stepper) {
     const fields = fieldsOf(stepper);
 
     if (fields.some(isRefused)) {
-        return stepOf(fields.find((field) => isRefused(field) || !field.checkValidity()));
+        return stepOf(stepper, fields.find((field) => isRefused(field) || !field.checkValidity()));
     }
 
-    const asked = Number(stepper.dataset.openAtStep);
+    // Unnamed steps carry an empty data-step, which an empty data-open-at-step must not pick.
+    const name = stepper.dataset.openAtStep;
+    const named = name ? stepsOf(stepper).findIndex((section) => section.dataset.step === name) : -1;
 
-    return sectionOf(stepper, asked) ? asked : null;
+    return named === -1 ? null : named;
 }
 
 /** A field the server refused: aria-invalid="true" beside its message. */
@@ -104,7 +111,7 @@ function advance(stepper) {
 
     if (isLast(stepper, step)) {
         submit(stepper);
-    } else if (fieldsOf(sectionOf(stepper, step)).every((field) => field.reportValidity())) {
+    } else if (fieldsOf(stepsOf(stepper)[step]).every((field) => field.reportValidity())) {
         moveTo(stepper, step + 1);
     }
 }
@@ -114,7 +121,7 @@ function submit(stepper) {
     const invalid = fieldsOf(stepper).find((field) => !field.checkValidity());
 
     if (invalid) {
-        show(stepper, stepOf(invalid));
+        show(stepper, stepOf(stepper, invalid));
         invalid.reportValidity();
 
         return;
@@ -126,26 +133,32 @@ function submit(stepper) {
 // To the new step's heading, so a screen reader starts where the step does.
 function moveTo(stepper, step) {
     show(stepper, step);
-    sectionOf(stepper, step)?.querySelector(HEADING)?.focus();
+    stepsOf(stepper)[step]?.querySelector(HEADING)?.focus();
 }
 
 function show(stepper, step) {
-    for (const section of stepsOf(stepper)) {
-        section.hidden = stepOf(section) !== step;
-    }
+    const steps = stepsOf(stepper);
 
-    for (const mark of stepper.querySelectorAll('[data-step-mark]')) {
-        const state = markStateOf(Number(mark.dataset.stepMark), step);
+    steps.forEach((section, place) => {
+        section.hidden = place !== step;
+    });
+
+    // Marks pair with the steps by place: the first mark is the first step's.
+    stepper.querySelectorAll(MARK).forEach((mark, place) => {
+        const state = markStateOf(place, step);
 
         if (state === null) {
             mark.removeAttribute(MARK_STATE);
         } else {
             mark.setAttribute(MARK_STATE, state);
         }
-    }
+    });
 
-    for (const label of stepper.querySelectorAll('[data-step-label]')) {
-        label.hidden = Number(label.dataset.stepLabel) !== step;
+    for (const progress of stepper.querySelectorAll(PROGRESS)) {
+        progress.textContent = progress.dataset.stepProgress.replace(
+            PROGRESS_PLACEHOLDER,
+            (_placeholder, name) => String(name === 'steps' ? steps.length : step + 1),
+        );
     }
 
     hideAll(stepper, BACK, step === FIRST_STEP);
@@ -171,24 +184,20 @@ function stepsOf(stepper) {
     return [...stepper.querySelectorAll(STEP)];
 }
 
-function sectionOf(stepper, step) {
-    return stepsOf(stepper).find((section) => stepOf(section) === step);
-}
-
-/** The step a section or a field belongs to. */
-function stepOf(element) {
-    return Number(element.closest(STEP).dataset.step);
+/** The place of the step a field belongs to. */
+function stepOf(stepper, field) {
+    return stepsOf(stepper).indexOf(field.closest(STEP));
 }
 
 /** The step showing; the first when none does. */
 function currentStepOf(stepper) {
-    const showing = stepsOf(stepper).find((section) => !section.hidden);
+    const showing = stepsOf(stepper).findIndex((section) => !section.hidden);
 
-    return showing ? stepOf(showing) : FIRST_STEP;
+    return showing === -1 ? FIRST_STEP : showing;
 }
 
 function isLast(stepper, step) {
-    return step >= stepsOf(stepper).length;
+    return step >= stepsOf(stepper).length - 1;
 }
 
 /** The fields of a step, or of every step in a stepper. */

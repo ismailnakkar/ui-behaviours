@@ -1,6 +1,6 @@
 import {afterEach, beforeAll, beforeEach, describe, expect, it} from 'vitest';
 import {installUiBehaviours} from '../src/index.js';
-import {$, buttons, enrolment, labels, marks, shown} from './steps-fixtures.js';
+import {$, buttons, enrolment, marks, progress, shown} from './steps-fixtures.js';
 
 // The listeners sit on the document and outlive each test's markup: install once. Opening on load has its own file.
 beforeAll(() => {
@@ -39,26 +39,35 @@ function pressEnter(selector, options = {}) {
 describe('data-steps', () => {
     it('walks the steps, the marks behind done and the one showing current', () => {
         click('[data-step-next]');
-        expect(shown()).toEqual(['2']);
+        expect(shown()).toEqual(['email']);
         expect(marks()).toEqual(['done', 'current', null]);
-        expect(labels()).toEqual(['Step 2 of 3']);
+        expect(progress()).toBe('Step 2 of 3');
         expect(buttons()).toEqual(['Back', 'Cancel', 'Next']);
         expect(document.activeElement.textContent).toBe('Confirm your email');
 
         type('#email_code', '123456');
         click('[data-step-next]');
-        expect(shown()).toEqual(['3']);
+        expect(shown()).toEqual(['app']);
         expect(marks()).toEqual(['done', 'done', 'current']);
-        expect(labels()).toEqual(['Step 3 of 3']);
+        expect(progress()).toBe('Step 3 of 3');
         expect(buttons()).toEqual(['Back', 'Cancel', 'Turn on']);
 
         click('[data-step-back]');
-        expect(shown()).toEqual(['2']);
+        expect(shown()).toEqual(['email']);
 
         click('[data-step-back]');
-        expect(shown()).toEqual(['1']);
+        expect(shown()).toEqual(['scan']);
         expect(marks()).toEqual(['current', null, null]);
         expect(buttons()).toEqual(['Cancel', 'Next']);
+    });
+
+    // The wording is the page's: a language may put the count first, and :steps is never read as :step plus an s.
+    it('fills data-step-progress\'s placeholders wherever the wording puts them', () => {
+        $('[data-step-progress]').dataset.stepProgress = ':steps steps; this is :step';
+
+        click('[data-step-next]');
+
+        expect(progress()).toBe('3 steps; this is 2');
     });
 
     it('holds a step until its fields pass', () => {
@@ -66,7 +75,7 @@ describe('data-steps', () => {
 
         click('[data-step-next]');
 
-        expect(shown()).toEqual(['2']);
+        expect(shown()).toEqual(['email']);
     });
 
     it('submits only once every step passes, showing the step of a field left empty', () => {
@@ -78,7 +87,7 @@ describe('data-steps', () => {
 
         click('[data-step-submit]');
         expect(submitted).toBe(0);
-        expect(shown()).toEqual(['2']);
+        expect(shown()).toEqual(['email']);
         expect(buttons()).toEqual(['Back', 'Cancel', 'Next']);
 
         type('#email_code', '123456');
@@ -92,7 +101,7 @@ describe('data-steps', () => {
         type('#email_code', '123456');
 
         expect(pressEnter('#email_code').defaultPrevented).toBe(true);
-        expect(shown()).toEqual(['3']);
+        expect(shown()).toEqual(['app']);
 
         type('#code', '654321');
         pressEnter('#code');
@@ -104,11 +113,11 @@ describe('data-steps', () => {
         type('#email_code', '123456');
 
         expect(pressEnter('#email_code', {isComposing: true}).defaultPrevented).toBe(false);
-        expect(shown()).toEqual(['2']);
+        expect(shown()).toEqual(['email']);
 
         $('#email_code').addEventListener('keydown', (event) => event.preventDefault(), {once: true});
         pressEnter('#email_code');
-        expect(shown()).toEqual(['2']);
+        expect(shown()).toEqual(['email']);
     });
 
     it('moves nothing on a click the page cancelled', () => {
@@ -116,7 +125,7 @@ describe('data-steps', () => {
 
         click('[data-step-next]');
 
-        expect(shown()).toEqual(['1']);
+        expect(shown()).toEqual(['scan']);
     });
 
     it('moves without sending the form when a control is a submit button', () => {
@@ -127,23 +136,23 @@ describe('data-steps', () => {
         $('[data-step-next]').dispatchEvent(event);
 
         expect(event.defaultPrevented).toBe(true);
-        expect(shown()).toEqual(['2']);
+        expect(shown()).toEqual(['email']);
     });
 
     it('works on any box, and the buttons outside a stepper do nothing', () => {
         document.body.innerHTML = `
             <form data-steps>
-                <section data-step="1"><input name="name" value="Jane"></section>
-                <section data-step="2" hidden><input name="email" required></section>
+                <section data-step="name"><input name="name" value="Jane"></section>
+                <section data-step="email" hidden><input name="email" required></section>
                 <button type="button" data-step-next>Next</button>
             </form>
             <button type="button" data-step-next id="stray">Next</button>`;
 
         click('#stray');
-        expect(shown()).toEqual(['1']);
+        expect(shown()).toEqual(['name']);
 
         click('form [data-step-next]');
-        expect(shown()).toEqual(['2']);
+        expect(shown()).toEqual(['email']);
     });
 });
 

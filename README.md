@@ -184,24 +184,20 @@ by one form.
 <dialog id="two-factor-dialog" aria-labelledby="two-factor-title" data-steps>
     <h2 id="two-factor-title">Turn on two-factor</h2>
     <div aria-hidden="true">
-        <i data-step-mark="1" data-step-state="current"></i><i data-step-mark="2"></i><i data-step-mark="3"></i>
+        <i data-step-mark data-step-state="current"></i><i data-step-mark></i><i data-step-mark></i>
     </div>
-    <p aria-live="polite">
-        <span data-step-label="1">Step 1 of 3</span>
-        <span data-step-label="2" hidden>Step 2 of 3</span>
-        <span data-step-label="3" hidden>Step 3 of 3</span>
-    </p>
+    <p aria-live="polite" data-step-progress="Step :step of :steps"></p>
 
     <form id="two-factor-enable" method="POST" action="/user/two-factor-authentication">
-        <section data-step="1">
+        <section data-step="scan">
             <h3 tabindex="-1">Scan the QR code</h3>
             …
         </section>
-        <section data-step="2" hidden>
+        <section data-step="email" hidden>
             <h3 tabindex="-1">Confirm your email</h3>
             <input name="email_code" required autocomplete="one-time-code">
         </section>
-        <section data-step="3" hidden>
+        <section data-step="app" hidden>
             <h3 tabindex="-1">Enter the code from your app</h3>
             <input name="code" required aria-invalid="true" aria-describedby="code-error" autocomplete="one-time-code">
             <p id="code-error">The code is not valid.</p>
@@ -215,8 +211,9 @@ by one form.
 </dialog>
 ```
 
-- **`data-step="n"`** on each step, numbered from 1 in the order they come, all inside one form. Only the step showing
-  is not `hidden`. Its fields are the inputs, selects and textareas in it.
+- **`data-step`** on each step, all inside one form: the steps go in the order they come, so none is numbered. Its
+  value is a name, needed only for `data-open-at-step` to point at; `data-step` alone is fine. Only the step showing is
+  not `hidden`. Its fields are the inputs, selects and textareas in it.
 - **`data-step-next`**: checks the step's fields (`reportValidity()`, so the browser says what is missing), then shows
   the next step and focuses its first heading; give the heading `tabindex="-1"`. From the last step it submits, as
   `data-step-submit` does. Enter in an input of a step does the same, so the form's own submit never skips a step's
@@ -224,9 +221,12 @@ by one form.
 - **`data-step-back`** shows the step before.
 - **`data-step-submit`**: checks every step's fields; one left empty shows its step and the browser's message, else the
   form is sent (`requestSubmit()`, so `data-confirm` and `data-submit-once` apply).
-- **`data-step-mark="n"`**, a progress mark: gets `data-step-state="done"` behind the step showing and `"current"` for
-  it; the marks ahead have none.
-- **`data-step-label="n"`**: shown only while step `n` shows, such as "Step 2 of 3" in a live region.
+- **`data-step-mark`**, a progress mark, one per step in the same order: gets `data-step-state="done"` behind the step
+  showing and `"current"` for it; the marks ahead have none.
+- **`data-step-progress="…"`**: the stepper writes this wording as the element's text, with `:step` as the showing
+  step's place from 1 and `:steps` as the count, such as "Step 2 of 3" in a live region. Laravel's `__()` given no
+  replacements leaves both placeholders in, so `data-step-progress="{{ __('enrolment.progress') }}"` works in every
+  locale.
 
 The controls may sit anywhere in the stepper, in or out of the form; one that is a submit button moves the steps without
 sending the form. Back is hidden on the first step, Next on the last, and Submit on every other.
@@ -237,11 +237,12 @@ On install, a stepper opens (`showModal()` on a dialog) at:
    refused submit came back as. A field the server never hands back, such as a mailed code, is empty again, so its step
    comes first. `aria-invalid="true"` is the one error mark the stepper reads: set it on each field the server refused,
    with its message.
-2. else **`data-open-at-step="n"`** on the stepper, such as the email step on the page after "Email me a code";
+2. else **`data-open-at-step="name"`** on the stepper, the step whose `data-step` has that name, such as the email
+   step on the page after "Email me a code";
 3. else nowhere: a dialog stays shut, and the stepper shows the step the server drew.
 
-Draw the first state on the server too (step 1 showing, its mark current, Back and Submit hidden): it is what shows
-before the script runs. A stepper added later works, but opens at nothing.
+Draw the first state on the server too (the first step showing, its mark current, Back and Submit hidden): it is what
+shows before the script runs. The `data-step-progress` text is written on install. A stepper added later works, but opens at nothing.
 
 ### `data-show-if="name=value"` and `data-clear-on="name"`
 
@@ -600,6 +601,15 @@ test one opening on load, put its markup in place before installing, in a test f
 Run this package's suite with `npm test`.
 
 ## Upgrading
+
+### From 0.5
+
+Steppers go by order and name, never by number:
+
+- `data-step="1"`, `"2"`, … become `data-step`, or `data-step="name"` for a step that `data-open-at-step` points at.
+- `data-open-at-step` takes that name: `data-open-at-step="2"` opens nothing now.
+- `data-step-mark="n"` becomes `data-step-mark`, one per step in the same order.
+- `data-step-label="n"` is gone: one `data-step-progress="Step :step of :steps"` element replaces the labels.
 
 ### From 0.4
 

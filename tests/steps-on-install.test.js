@@ -1,5 +1,5 @@
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
-import {$, buttons, enrolment, labels, marks, shown} from './steps-fixtures.js';
+import {$, buttons, enrolment, marks, progress, shown} from './steps-fixtures.js';
 
 // A stepper opens as the behaviours are installed, once per page: each case loads a fresh copy after its markup.
 async function install(markup) {
@@ -22,24 +22,35 @@ describe('a stepper on install', () => {
         await install(enrolment());
 
         expect($('dialog').open).toBe(false);
-        expect(shown()).toEqual(['1']);
+        expect(shown()).toEqual(['scan']);
         expect(buttons()).toEqual(['Cancel', 'Next']);
     });
 
     it('opens at data-open-at-step, as on the page after "Email me a code"', async () => {
-        await install(enrolment({dialog: 'data-open-at-step="2"'}));
+        await install(enrolment({dialog: 'data-open-at-step="email"'}));
 
         expect($('dialog').open).toBe(true);
-        expect(shown()).toEqual(['2']);
+        expect(shown()).toEqual(['email']);
         expect(marks()).toEqual(['done', 'current', null]);
-        expect(labels()).toEqual(['Step 2 of 3']);
+        expect(progress()).toBe('Step 2 of 3');
     });
 
-    it('ignores a data-open-at-step it has no step for', async () => {
-        await install(enrolment({dialog: 'data-open-at-step="7"'}));
+    it('ignores a data-open-at-step it has no step for, a place included', async () => {
+        await install(enrolment({dialog: 'data-open-at-step="2"'}));
 
         expect($('dialog').open).toBe(false);
-        expect(shown()).toEqual(['1']);
+        expect(shown()).toEqual(['scan']);
+    });
+
+    it('writes the first step\'s progress, and an empty data-open-at-step opens no unnamed step', async () => {
+        await install(`
+            <dialog data-steps data-open-at-step="">
+                <p data-step-progress="Step :step of :steps"></p>
+                <form><section data-step></section><section data-step hidden></section></form>
+            </dialog>`);
+
+        expect($('dialog').open).toBe(false);
+        expect(progress()).toBe('Step 1 of 2');
     });
 
     // The mailed code is never handed back, so after a refused app code the empty email step comes first.
@@ -47,13 +58,13 @@ describe('a stepper on install', () => {
         await install(enrolment({code: 'aria-invalid="true"'}));
 
         expect($('dialog').open).toBe(true);
-        expect(shown()).toEqual(['2']);
+        expect(shown()).toEqual(['email']);
     });
 
     it('opens at the refused field\'s step once the steps before it are filled, over data-open-at-step', async () => {
-        await install(enrolment({dialog: 'data-open-at-step="2"', email: 'value="123456"', code: 'aria-invalid="true"'}));
+        await install(enrolment({dialog: 'data-open-at-step="email"', email: 'value="123456"', code: 'aria-invalid="true"'}));
 
-        expect(shown()).toEqual(['3']);
+        expect(shown()).toEqual(['app']);
         expect(buttons()).toEqual(['Back', 'Cancel', 'Turn on']);
     });
 
@@ -65,12 +76,12 @@ describe('a stepper on install', () => {
 
     it('shows the step a box that is no dialog opens at', async () => {
         await install(`
-            <form data-steps data-open-at-step="2">
-                <section data-step="1"></section>
-                <section data-step="2" hidden></section>
+            <form data-steps data-open-at-step="email">
+                <section data-step></section>
+                <section data-step="email" hidden></section>
             </form>`);
 
-        expect(shown()).toEqual(['2']);
+        expect(shown()).toEqual(['email']);
     });
 
     // showModal() focuses the dialog's first focusable element, which must be in the step that shows.
@@ -82,8 +93,8 @@ describe('a stepper on install', () => {
             showModal.call(this);
         });
 
-        await install(enrolment({dialog: 'data-open-on-load data-open-at-step="2"'}));
+        await install(enrolment({dialog: 'data-open-on-load data-open-at-step="email"'}));
 
-        expect(stepsAtOpen).toEqual([['2']]);
+        expect(stepsAtOpen).toEqual([['email']]);
     });
 });
