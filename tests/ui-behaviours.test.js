@@ -1,5 +1,5 @@
 import {afterEach, beforeAll, describe, expect, it, vi} from 'vitest';
-import {copyText, installUiBehaviours} from '../src/index.js';
+import {copyText, installUiBehaviours, post} from '../src/index.js';
 
 // The listeners sit on the document and outlive each test's markup: install once.
 beforeAll(() => {
@@ -636,5 +636,191 @@ describe('closedby="any"', () => {
         } finally {
             delete HTMLDialogElement.prototype.closedBy;
         }
+    });
+});
+
+/** A banner with its close button as a direct child, the one shape data-dismiss reads. */
+const banner = (words) => `<div role="status"><div>${words}</div><button type="button" data-dismiss><svg></svg></button></div>`;
+
+function reducedMotion(matches) {
+    vi.stubGlobal('matchMedia', (media) => ({matches, media}));
+}
+
+describe('data-dismiss', () => {
+    it('hides its own banner, leaves the page around it and hands focus to main', () => {
+        reducedMotion(true);
+        document.body.innerHTML = `<main tabindex="-1">${banner('Link saved.')}${banner('That link is gone.')}<p>Page</p></main>`;
+        const [saved, gone] = document.querySelectorAll('[role="status"]');
+        saved.querySelector('button').focus();
+
+        // On the icon, as a mouse clicks, not on the button itself.
+        click(saved.querySelector('svg'));
+
+        expect(saved.hidden).toBe(true);
+        expect(gone.hidden).toBe(false);
+        expect(document.querySelector('p').textContent).toBe('Page');
+        expect(document.activeElement).toBe(document.querySelector('main'));
+    });
+
+    it('fades the banner out, inert, before it hides, with focus already on main', async () => {
+        reducedMotion(false);
+        let finish;
+        const fade = vi.spyOn(Element.prototype, 'animate').mockImplementation(() => ({
+            finished: new Promise((resolve) => {
+                finish = resolve;
+            }),
+        }));
+        document.body.innerHTML = `<main tabindex="-1">${banner('Link saved.')}</main>`;
+        const saved = document.querySelector('[role="status"]');
+        saved.querySelector('button').focus();
+
+        click(saved.querySelector('button'));
+
+        expect(fade).toHaveBeenCalledWith({opacity: [1, 0]}, {duration: 150, easing: 'ease-in'});
+        expect(saved.inert).toBe(true);
+        expect(saved.hidden).toBe(false);
+        expect(document.activeElement).toBe(document.querySelector('main'));
+
+        finish();
+        await Promise.resolve();
+
+        expect(saved.hidden).toBe(true);
+        expect(saved.inert).toBe(false);
+    });
+
+    it('dismisses a banner the page showed again, as a reused toast', () => {
+        reducedMotion(true);
+        document.body.innerHTML = banner('Link saved.');
+        const toast = document.querySelector('[role="status"]');
+
+        click(toast.querySelector('button'));
+        toast.hidden = false;
+        click(toast.querySelector('button'));
+
+        expect(toast.hidden).toBe(true);
+    });
+
+    it('leaves a banner shown again mid-fade shown, once its fade is cancelled', async () => {
+        reducedMotion(false);
+        document.body.innerHTML = banner('Link saved.');
+        const toast = document.querySelector('[role="status"]');
+
+        click(toast.querySelector('button'));
+        const [fade] = toast.getAnimations();
+        const settled = fade.finished.catch(() => {});
+        fade.cancel();
+        toast.hidden = false;
+        await settled;
+        await Promise.resolve();
+
+        expect(toast.hidden).toBe(false);
+        expect(toast.inert).toBe(false);
+    });
+
+    it('leaves focus outside the banner where it is', () => {
+        reducedMotion(true);
+        document.body.innerHTML = `<main tabindex="-1"><input>${banner('Link saved.')}</main>`;
+        const input = document.querySelector('input');
+        input.focus();
+
+        click(document.querySelector('[data-dismiss]'));
+
+        expect(document.querySelector('[role="status"]').hidden).toBe(true);
+        expect(document.activeElement).toBe(input);
+    });
+
+    it('ignores a click anywhere else in the banner, and a click the page cancelled', () => {
+        reducedMotion(true);
+        document.body.innerHTML = banner('Link saved.');
+        const saved = document.querySelector('[role="status"]');
+        const button = saved.querySelector('button');
+        button.addEventListener('click', (event) => event.preventDefault());
+
+        click(saved.querySelector('div'));
+        click(button);
+
+        expect(saved.hidden).toBe(false);
+    });
+});
+
+function dropdown() {
+    document.body.innerHTML = '<details data-dropdown open><summary>EN</summary><button>Français</button></details><main>Page</main>';
+
+    return document.querySelector('details');
+}
+
+describe('data-dropdown', () => {
+    it('closes on a click outside it', () => {
+        const details = dropdown();
+
+        click(document.querySelector('main'));
+
+        expect(details.open).toBe(false);
+    });
+
+    it('stays open on a click inside it', () => {
+        const details = dropdown();
+
+        click(document.querySelector('button'));
+
+        expect(details.open).toBe(true);
+    });
+
+    it('closes on Escape and hands focus back to its summary', () => {
+        const details = dropdown();
+        const summary = details.querySelector('summary');
+        summary.tabIndex = 0;
+
+        document.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape'}));
+
+        expect(details.open).toBe(false);
+        expect(document.activeElement).toBe(summary);
+    });
+
+    it('leaves any other details alone', () => {
+        document.body.innerHTML = '<details open id="faq"><summary>Why?</summary></details><main>Page</main>';
+
+        click(document.querySelector('main'));
+        document.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape'}));
+
+        expect(document.querySelector('#faq').open).toBe(true);
+    });
+});
+
+describe('post', () => {
+    afterEach(() => {
+        document.head.innerHTML = '';
+        document.documentElement.lang = '';
+    });
+
+    it('posts the body with the AJAX, CSRF and language headers Laravel reads', async () => {
+        document.head.innerHTML = '<meta name="csrf-token" content="token-123">';
+        document.documentElement.lang = 'fr';
+        const answer = new Response('{}');
+        const send = vi.fn(async () => answer);
+        vi.stubGlobal('fetch', send);
+        const body = new FormData();
+        body.append('url', 'https://example.com');
+
+        expect(await post('/links/shorten', body)).toBe(answer);
+        expect(send).toHaveBeenCalledWith('/links/shorten', {
+            method: 'POST',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                Accept: 'application/json',
+                'X-CSRF-TOKEN': 'token-123',
+                'Accept-Language': 'fr',
+            },
+            body,
+        });
+    });
+
+    it('leaves the token and the language to the form and the browser on a page without them', async () => {
+        const send = vi.fn(async () => new Response('{}'));
+        vi.stubGlobal('fetch', send);
+
+        await post('/contact', new URLSearchParams({_token: 'in-the-form'}));
+
+        expect(send.mock.calls[0][1].headers).toStrictEqual({'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json'});
     });
 });

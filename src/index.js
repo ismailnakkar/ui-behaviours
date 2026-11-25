@@ -13,6 +13,13 @@ const CLOSED_BY_ANY = 'any';
 /** Between a field's name and its value in data-show-if: "method=paypal". */
 const SHOW_IF_SEPARATOR = '=';
 
+const DISMISS_FADE_MS = 150;
+
+const OPEN_DROPDOWNS = 'details[data-dropdown][open]';
+
+/** Laravel's layout tag for the session's CSRF token: <meta name="csrf-token" content="{{ csrf_token() }}">. */
+const CSRF_TOKEN = 'meta[name="csrf-token"]';
+
 const copyTimers = new WeakMap();
 
 /** The dialog a press landed on outside its box: a selection dragged out of the body must not close it. */
@@ -34,6 +41,9 @@ export const installUiBehaviours = once(() => {
     document.addEventListener('click', closeModal);
     document.addEventListener('pointerdown', pressBackdrop);
     document.addEventListener('click', closeOnBackdrop);
+    document.addEventListener('click', dismissBanner);
+    document.addEventListener('click', closeDropdownsOutside);
+    document.addEventListener('keydown', closeDropdownsOnEscape);
 
     // First: a stepper dialog opened on load shows its step before showModal() moves focus in.
     installSteps();
@@ -49,6 +59,26 @@ export async function copyText(text) {
         // Absent on plain http, rejects when refused.
         return false;
     }
+}
+
+/**
+ * X-Requested-With makes it $request->ajax(); Accept has Laravel answer a refusal (422, 419) as JSON, not a redirect;
+ * the page's language serves a route with none in its URL, where the browser's own would win.
+ */
+export function post(url, body) {
+    const headers = {'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json'};
+    const token = document.querySelector(CSRF_TOKEN)?.content;
+    const language = document.documentElement.lang;
+
+    if (token) {
+        headers['X-CSRF-TOKEN'] = token;
+    }
+
+    if (language) {
+        headers['Accept-Language'] = language;
+    }
+
+    return fetch(url, {method: 'POST', headers, body});
 }
 
 function isField(element) {
@@ -321,5 +351,61 @@ function closeOnBackdrop(event) {
 
     if (dialog && backdropDialogOf(event) === dialog) {
         dialog.close();
+    }
+}
+
+// Focus is moved out first: focus inside a hidden element falls to <body> and loses the keyboard user's place.
+function dismissBanner(event) {
+    const banner = closestTo(event, '[data-dismiss]')?.parentElement;
+
+    if (!banner || event.defaultPrevented) {
+        return;
+    }
+
+    if (banner.contains(document.activeElement)) {
+        document.querySelector('main')?.focus({preventScroll: true});
+    }
+
+    fadeOut(banner);
+}
+
+// Hidden, not removed, so a page may show the banner again; inert while it fades, at once under reduced motion or
+// without the Web Animations API. A cancelled fade leaves it shown: that is how a page shows it again mid-fade.
+function fadeOut(banner) {
+    const release = () => {
+        banner.inert = false;
+    };
+    const hide = () => {
+        banner.hidden = true;
+        release();
+    };
+
+    if (typeof banner.animate !== 'function' || matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        hide();
+
+        return;
+    }
+
+    banner.inert = true;
+    banner.animate({opacity: [1, 0]}, {duration: DISMISS_FADE_MS, easing: 'ease-in'}).finished.then(hide, release);
+}
+
+// A <details> has no light dismiss of its own, unlike a popover.
+function closeDropdownsOutside({target}) {
+    for (const dropdown of document.querySelectorAll(OPEN_DROPDOWNS)) {
+        if (!(target instanceof Node && dropdown.contains(target))) {
+            dropdown.open = false;
+        }
+    }
+}
+
+function closeDropdownsOnEscape({key}) {
+    if (key !== 'Escape') {
+        return;
+    }
+
+    for (const dropdown of document.querySelectorAll(OPEN_DROPDOWNS)) {
+        dropdown.open = false;
+        dropdown.querySelector(':scope > summary')?.focus();
     }
 }

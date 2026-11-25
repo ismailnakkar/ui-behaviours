@@ -2,8 +2,10 @@
 
 Page behaviours from plain HTML attributes: copy to the clipboard and say the result to screen readers, confirm
 a submit, send a form once, send a form on a change, open, close and light-dismiss a native `<dialog>`, walk a form's
-steps one at a time, show what a radio, a checkbox or a select chose, check every row from a header box, and select a
-field's text on a click. They listen on the document, so markup added later works too.
+steps one at a time, show what a radio, a checkbox or a select chose, check every row from a header box, select a
+field's text on a click, dismiss a banner, and close a `<details>` menu on an outside click or Escape. They listen on
+the document, so markup added later works too. A `post()` helper sends a page script's request the way Laravel expects
+one.
 
 A date range picker over [Cally](https://wicky.nillia.ms/cally/) has its own entry, so pages without one never load the
 calendar, and an optional stylesheet themed by custom properties. Nothing else ships styles, and nothing ships wording:
@@ -49,6 +51,8 @@ Then mark up the page:
 | [`data-clear-on="name"`](#data-show-ifnamevalue-and-data-clear-onname) | a field in a form | empties it when another radio `name` is picked |
 | [`data-check-all="name"`](#data-check-allname) | a header checkbox | checks every row named `name` |
 | [`data-autoselect`](#data-autoselect) | an input or a textarea | selects its text on a click |
+| [`data-dismiss`](#data-dismiss) | a button in a banner | fades the banner out and hides it |
+| [`data-dropdown`](#data-dropdown) | a `<details>` | closes it on a click outside it or Escape |
 
 ### `data-copy="id"`
 
@@ -306,6 +310,34 @@ On an input or a textarea: a click selects all of its text, as tabbing in alread
 <input value="https://example.com/abcd" readonly data-autoselect>
 ```
 
+### `data-dismiss`
+
+On a button that is a direct child of a banner (a flash message, a toast): a click fades the banner out over 150ms,
+`inert` meanwhile, then sets `hidden` on it. Under reduced motion, or without the Web Animations API, it hides at once.
+The banner stays in the page, so a script may show it again by clearing `hidden` (`banner.hidden = false`); during the
+fade, cancel it first (`banner.getAnimations().forEach((animation) => animation.cancel())`), or it hides. When focus
+was inside the banner it moves to the page's `<main>` first, so a keyboard user keeps their place. A click the page
+cancelled dismisses nothing.
+
+```html
+<div role="status" class="flash">
+    <p>Link saved.</p>
+    <button type="button" data-dismiss aria-label="Dismiss">×</button>
+</div>
+```
+
+### `data-dropdown`
+
+On a `<details>` used as a menu: a click anywhere outside an open one closes it, and Escape closes every open one and
+focuses its `<summary>`, which a `<details>` does not do itself. Other `<details>` (an FAQ) are left alone.
+
+```html
+<details data-dropdown>
+    <summary>English</summary>
+    <form method="POST" action="/locale">…</form>
+</details>
+```
+
 ## Styling
 
 The package sets attributes and the browser's own states; the app styles them:
@@ -313,6 +345,10 @@ The package sets attributes and the browser's own states; the app styles them:
 - `[data-copied]` and `[data-copy-failed]` on a copy button: show its "Copied" or "Copy it by hand" label instead of
   "Copy". The words are the app's, in the button.
 - `[data-submitting]` on a form sent once, to show the wait.
+- `[hidden]` on a dismissed banner. A `display` of the app's own on the banner (a `flex` class, an inline
+  `style="display: flex"`) beats the attribute: hide it with `[hidden] { display: none !important; }` (Tailwind 4's
+  preflight has this rule), and show a reused banner by clearing `hidden`, not by setting `display`.
+- `details[open]` for an open `data-dropdown`.
 - `[data-step-state="done"]` and `[data-step-state="current"]` on a stepper's progress marks.
 - `dialog`, `dialog::backdrop`, and `dialog[open]` for an opening transition.
 - `:indeterminate` on a header checkbox, if the app restyles checkboxes.
@@ -351,10 +387,14 @@ The package sets attributes and the browser's own states; the app styles them:
   changes it at once: keep `data-submit-on-change` to a sort or a filter that is cheap to redo, and give the form a
   submit button for a page without script.
 - A stepper moves focus to the new step's heading, so a screen reader starts where the step does: give each a
-  `tabindex="-1"`. Hide the progress marks (`aria-hidden="true"`) and put the step's words in a `data-step-label` inside
-  an `aria-live="polite"` region.
+  `tabindex="-1"`. Hide the progress marks (`aria-hidden="true"`) and give the `data-step-progress` element
+  `aria-live="polite"`.
 - Point a field's `aria-describedby` at its `data-show-if` hints' box, in an `aria-live="polite"` region, so a warning
   shown on a pick is read out.
+- A dismissed banner hands focus to `<main>`: give it `tabindex="-1"` (a skip link's target already has it), or focus
+  falls to `<body>`. Give a `data-dismiss` button that shows only an icon an `aria-label`.
+- A `data-dropdown`'s `<summary>` is its button: put the menu's name in it, and a `<details>` says itself whether it is
+  open.
 
 ## Range picker
 
@@ -556,6 +596,7 @@ stylesheet does.
 |---|---|
 | `installUiBehaviours()` | listens on the document for every behaviour above, opens the `data-open-on-load` dialogs and shows each stepper at the step it opens at; later calls do nothing |
 | `copyText(text)` | the copy buttons' clipboard write: resolves to `true` when the clipboard took the text, `false` where `navigator.clipboard` is absent (plain http) or refuses |
+| `post(url, body)` | `fetch()`es a `FormData` or `URLSearchParams` body to `url` as a POST that Laravel answers as an AJAX request; resolves to the `Response` |
 | `installRangePicker()`, from `@ismailnakkar/ui-behaviours/range-picker` | listens on the document for range pickers and writes those already on the page; later calls do nothing |
 | `@ismailnakkar/ui-behaviours/range-picker.css` | the range picker's [stylesheet](#styling-the-picker) |
 
@@ -569,11 +610,29 @@ if (!(await copyText(url))) {
 }
 ```
 
+`post()` serves a page script that sends a form itself. It sends `X-Requested-With: XMLHttpRequest` (so
+`$request->ajax()` holds), `Accept: application/json` (so a refusal comes back as JSON: a 422 with the field errors, not
+a redirect), the `<meta name="csrf-token" content="{{ csrf_token() }}">` token as `X-CSRF-TOKEN`, and the page's
+`<html lang>` as `Accept-Language`, so a route with no language in its URL answers in the page's language. A page
+without the meta tag sends the form's `@csrf` field instead; one without a `lang` sends the browser's language. Like
+`fetch()`, it rejects only when the request fails: check `response.ok` or `response.status` for a refusal.
+
+```js
+import {post} from '@ismailnakkar/ui-behaviours';
+
+const response = await post(form.action, new FormData(form));
+
+if (response.status === 422) {
+    showErrors((await response.json()).errors);
+}
+```
+
 ## Events
 
-The package fires none of its own. A dialog's native `close` fires when a close button or the backdrop closes it, the
-range picker's radios fire the native `change`, and a `data-submit-on-change` field's form the native `submit`. Cally's
-`change` and `rangestart` do not bubble: listen to them in the capture phase, as the package does.
+The package fires none of its own. A dialog's native `close` fires when a close button or the backdrop closes it, a
+`data-dropdown`'s native `toggle` when it closes, the range picker's radios fire the native `change`, and a
+`data-submit-on-change` field's form the native `submit`. Cally's `change` and `rangestart` do not bubble: listen to
+them in the capture phase, as the package does.
 
 ## Testing
 
@@ -594,13 +653,28 @@ customElements.define('calendar-range', class extends HTMLElement {
 });
 ```
 
+A dismissed banner hides once its 150ms fade ends: wait for it (`vi.waitFor`), or stub `matchMedia` to match
+`(prefers-reduced-motion: reduce)` so it hides at once. A test of a script that calls `post()` stubs `fetch`
+(`vi.stubGlobal('fetch', …)`).
+
 A stepper needs nothing more: happy-dom and jsdom check `required` fields and send a form with `requestSubmit()`. To
 test one opening on load, put its markup in place before installing, in a test file of its own or after
 `vi.resetModules()` with a fresh `import()`.
 
-Run this package's suite with `npm test`.
+Run this package's suite with `npm test`: oxlint, then Vitest.
 
 ## Upgrading
+
+### From 0.6
+
+The package now acts on `data-dismiss` and `details[data-dropdown]`. A page without either works as before; one with
+them:
+
+- Remove any script of your own for either attribute, or both run (a banner faded twice).
+- A `data-dismiss` that another script reads, such as Bootstrap 4's `data-dismiss="modal"`, now also hides its button's
+  parent: give that script an attribute of its own (Bootstrap 5's `data-bs-dismiss`).
+- A dismissed banner is `hidden`, not removed: a test that checked it was gone checks `hidden`, and a `display` of
+  your own on the banner needs `[hidden] { display: none !important; }` to lose to it (see [Styling](#styling)).
 
 ### From 0.5
 
