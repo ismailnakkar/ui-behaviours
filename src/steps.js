@@ -1,4 +1,4 @@
-import {closestTo} from './helpers.js';
+import {closestTo, moveFocusTo} from './helpers.js';
 
 const STEPPER = '[data-steps]';
 const STEP = '[data-step]';
@@ -133,7 +133,7 @@ function submit(stepper) {
 // To the new step's heading, so a screen reader starts where the step does.
 function moveTo(stepper, step) {
     show(stepper, step);
-    stepsOf(stepper)[step]?.querySelector(HEADING)?.focus();
+    moveFocusTo(stepsOf(stepper)[step]?.querySelector(HEADING));
 }
 
 function show(stepper, step) {

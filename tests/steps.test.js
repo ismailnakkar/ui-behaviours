@@ -61,6 +61,19 @@ describe('data-steps', () => {
         expect(buttons()).toEqual(['Cancel', 'Next']);
     });
 
+    it('gives the heading it focuses tabindex="-1", and keeps a tabindex the page set', () => {
+        $('[data-step="app"] h3').tabIndex = 0;
+
+        click('[data-step-next]');
+        expect(document.activeElement).toBe($('[data-step="email"] h3'));
+        expect(document.activeElement.getAttribute('tabindex')).toBe('-1');
+
+        type('#email_code', '123456');
+        click('[data-step-next]');
+        expect(document.activeElement).toBe($('[data-step="app"] h3'));
+        expect(document.activeElement.getAttribute('tabindex')).toBe('0');
+    });
+
     // The wording is the page's: a language may put the count first, and :steps is never read as :step plus an s.
     it('fills data-step-progress\'s placeholders wherever the wording puts them', () => {
         $('[data-step-progress]').dataset.stepProgress = ':steps steps; this is :step';

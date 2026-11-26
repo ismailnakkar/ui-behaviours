@@ -194,15 +194,15 @@ by one form.
 
     <form id="two-factor-enable" method="POST" action="/user/two-factor-authentication">
         <section data-step="scan">
-            <h3 tabindex="-1">Scan the QR code</h3>
+            <h3>Scan the QR code</h3>
             …
         </section>
         <section data-step="email" hidden>
-            <h3 tabindex="-1">Confirm your email</h3>
+            <h3>Confirm your email</h3>
             <input name="email_code" required autocomplete="one-time-code">
         </section>
         <section data-step="app" hidden>
-            <h3 tabindex="-1">Enter the code from your app</h3>
+            <h3>Enter the code from your app</h3>
             <input name="code" required aria-invalid="true" aria-describedby="code-error" autocomplete="one-time-code">
             <p id="code-error">The code is not valid.</p>
         </section>
@@ -219,9 +219,9 @@ by one form.
   value is a name, needed only for `data-open-at-step` to point at; `data-step` alone is fine. Only the step showing is
   not `hidden`. Its fields are the inputs, selects and textareas in it.
 - **`data-step-next`**: checks the step's fields (`reportValidity()`, so the browser says what is missing), then shows
-  the next step and focuses its first heading; give the heading `tabindex="-1"`. From the last step it submits, as
-  `data-step-submit` does. Enter in an input of a step does the same, so the form's own submit never skips a step's
-  check; Enter while an input method composes is left alone.
+  the next step and focuses its first heading. From the last step it submits, as `data-step-submit` does. Enter in an
+  input of a step does the same, so the form's own submit never skips a step's check; Enter while an input method
+  composes is left alone.
 - **`data-step-back`** shows the step before.
 - **`data-step-submit`**: checks every step's fields; one left empty shows its step and the browser's message, else the
   form is sent (`requestSubmit()`, so `data-confirm` and `data-submit-once` apply).
@@ -386,13 +386,14 @@ The package sets attributes and the browser's own states; the app styles them:
 - A change that submits moves the page under the user, and on some desktop browsers an arrow key on a closed select
   changes it at once: keep `data-submit-on-change` to a sort or a filter that is cheap to redo, and give the form a
   submit button for a page without script.
-- A stepper moves focus to the new step's heading, so a screen reader starts where the step does: give each a
-  `tabindex="-1"`. Hide the progress marks (`aria-hidden="true"`) and give the `data-step-progress` element
-  `aria-live="polite"`.
+- A stepper moves focus to the new step's heading, so a screen reader starts where the step does. Hide the progress
+  marks (`aria-hidden="true"`) and give the `data-step-progress` element `aria-live="polite"`.
 - Point a field's `aria-describedby` at its `data-show-if` hints' box, in an `aria-live="polite"` region, so a warning
   shown on a pick is read out.
-- A dismissed banner hands focus to `<main>`: give it `tabindex="-1"` (a skip link's target already has it), or focus
-  falls to `<body>`. Give a `data-dismiss` button that shows only an icon an `aria-label`.
+- A dismissed banner hands focus to `<main>`; on a page without one, focus falls to `<body>`. Give a `data-dismiss`
+  button that shows only an icon an `aria-label`.
+- A heading or a `<main>` the package focuses takes no focus of its own: one without a `tabindex` gets
+  `tabindex="-1"` first, so script can focus it and Tab still skips it. A `tabindex` of the page's own is kept.
 - A `data-dropdown`'s `<summary>` is its button: put the menu's name in it, and a `<details>` says itself whether it is
   open.
 
@@ -664,6 +665,11 @@ test one opening on load, put its markup in place before installing, in a test f
 Run this package's suite with `npm test`: oxlint, then Vitest.
 
 ## Upgrading
+
+### From 0.7.0
+
+Nothing changes for a page on 0.7.0. `<main>` and a stepper's headings no longer need `tabindex="-1"` in the markup
+for the package to focus them: it sets one where there is none. A page may delete its own; leaving it changes nothing.
 
 ### From 0.6
 

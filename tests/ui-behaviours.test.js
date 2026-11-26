@@ -729,6 +729,44 @@ describe('data-dismiss', () => {
         expect(document.activeElement).toBe(input);
     });
 
+    it('gives a main without a tabindex tabindex="-1" before it hands it focus', () => {
+        reducedMotion(true);
+        document.body.innerHTML = `<main>${banner('Link saved.')}</main>`;
+        const main = document.querySelector('main');
+        document.querySelector('[data-dismiss]').focus();
+
+        click(document.querySelector('[data-dismiss]'));
+
+        expect(main.getAttribute('tabindex')).toBe('-1');
+        expect(document.activeElement).toBe(main);
+    });
+
+    it('keeps the tabindex the page gave main', () => {
+        reducedMotion(true);
+        document.body.innerHTML = `<main tabindex="0">${banner('Link saved.')}</main>`;
+        const main = document.querySelector('main');
+        document.querySelector('[data-dismiss]').focus();
+
+        click(document.querySelector('[data-dismiss]'));
+
+        expect(main.getAttribute('tabindex')).toBe('0');
+        expect(document.activeElement).toBe(main);
+    });
+
+    // A browser drops focus from a hidden element to <body>; happy-dom leaves it on the button.
+    it('moves focus nowhere on a page without a main', () => {
+        reducedMotion(true);
+        document.body.innerHTML = banner('Link saved.');
+        const button = document.querySelector('[data-dismiss]');
+        button.focus();
+
+        click(button);
+
+        expect(document.querySelector('[role="status"]').hidden).toBe(true);
+        expect(document.activeElement).toBe(button);
+        expect(document.querySelector('[tabindex]')).toBeNull();
+    });
+
     it('ignores a click anywhere else in the banner, and a click the page cancelled', () => {
         reducedMotion(true);
         document.body.innerHTML = banner('Link saved.');

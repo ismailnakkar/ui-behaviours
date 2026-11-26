@@ -1,6 +1,6 @@
 {
     "name": "@ismailnakkar/ui-behaviours",
-    "version": "0.7.0",
+    "version": "0.7.1",
     "description": "Page behaviours from plain HTML attributes (copy with a spoken result, confirm, submit once or on a change, native dialogs, steps, show by a radio, checkbox or select, check all, autoselect, dismiss a banner, light-dismiss a details menu), a Laravel-ready post(), and a date range picker over Cally with an optional stylesheet.",
     "keywords": [
         "clipboard",

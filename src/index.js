@@ -1,4 +1,4 @@
-import {closestTo, isCheckbox, isRadio, once} from './helpers.js';
+import {closestTo, isCheckbox, isRadio, moveFocusTo, once} from './helpers.js';
 import {installSteps} from './steps.js';
 
 const COPY_FLASH_MS = 1500;
@@ -363,7 +363,7 @@ function dismissBanner(event) {
     }
 
     if (banner.contains(document.activeElement)) {
-        document.querySelector('main')?.focus({preventScroll: true});
+        moveFocusTo(document.querySelector('main'), {preventScroll: true});
     }
 
     fadeOut(banner);

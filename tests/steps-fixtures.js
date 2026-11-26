@@ -9,13 +9,13 @@ export function enrolment({dialog = '', email = '', code = ''} = {}) {
             <p aria-live="polite" data-step-progress="Step :step of :steps"></p>
             <form id="two-factor-enable" method="POST" action="/user/two-factor-authentication">
                 <input type="hidden" name="_token" value="csrf">
-                <section data-step="scan"><h3 tabindex="-1">Scan the QR code</h3></section>
+                <section data-step="scan"><h3>Scan the QR code</h3></section>
                 <section data-step="email" hidden>
-                    <h3 tabindex="-1">Confirm your email</h3>
+                    <h3>Confirm your email</h3>
                     <input id="email_code" name="email_code" required ${email}>
                 </section>
                 <section data-step="app" hidden>
-                    <h3 tabindex="-1">Enter the code from your app</h3>
+                    <h3>Enter the code from your app</h3>
                     <input id="code" name="code" required ${code}>
                 </section>
             </form>
