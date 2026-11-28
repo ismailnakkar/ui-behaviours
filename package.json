@@ -1,7 +1,7 @@
 {
     "name": "@ismailnakkar/ui-behaviours",
-    "version": "0.7.1",
-    "description": "Page behaviours from plain HTML attributes (copy with a spoken result, confirm, submit once or on a change, native dialogs, steps, show by a radio, checkbox or select, check all, autoselect, dismiss a banner, light-dismiss a details menu), a Laravel-ready post(), and a date range picker over Cally with an optional stylesheet.",
+    "version": "0.8.0",
+    "description": "Page behaviours from plain HTML attributes (copy with a spoken result, confirm, submit once or on a change, native dialogs, steps, show by a radio, checkbox or select, check all, autoselect, dismiss a banner, light-dismiss a details menu), a Laravel-ready post(), a date range picker over Cally with an optional stylesheet, and an optional scrollbar stylesheet.",
     "keywords": [
         "clipboard",
         "dialog",
@@ -13,7 +13,8 @@
         "dropdown",
         "dismiss",
         "fetch",
-        "laravel"
+        "laravel",
+        "scrollbar"
     ],
     "homepage": "https://github.com/ismailnakkar/ui-behaviours",
     "bugs": {
@@ -43,6 +44,10 @@
         "./range-picker.css": {
             "types": "./src/range-picker.d.css.ts",
             "default": "./src/range-picker.css"
+        },
+        "./scrollbar.css": {
+            "types": "./src/scrollbar.d.css.ts",
+            "default": "./src/scrollbar.css"
         }
     },
     "files": [
@@ -50,7 +55,8 @@
     ],
     "sideEffects": [
         "./src/range-picker.js",
-        "./src/range-picker.css"
+        "./src/range-picker.css",
+        "./src/scrollbar.css"
     ],
     "publishConfig": {
         "access": "public"

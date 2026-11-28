@@ -8,8 +8,9 @@ the document, so markup added later works too. A `post()` helper sends a page sc
 one.
 
 A date range picker over [Cally](https://wicky.nillia.ms/cally/) has its own entry, so pages without one never load the
-calendar, and an optional stylesheet themed by custom properties. Nothing else ships styles, and nothing ships wording:
-the app styles the states the package sets, and every word comes from the app's markup.
+calendar, and an optional stylesheet themed by custom properties. A second optional stylesheet draws
+[scrollbars](#scrollbars) that stay in sight. Nothing else ships styles, and nothing ships wording: the app styles the
+states the package sets, and every word comes from the app's markup.
 
 ## Install
 
@@ -397,6 +398,49 @@ The package sets attributes and the browser's own states; the app styles them:
 - A `data-dropdown`'s `<summary>` is its button: put the menu's name in it, and a `<details>` says itself whether it is
   open.
 
+## Scrollbars
+
+On macOS a scrollbar shows only while the box moves, so a box cut short by a `max-height` reads as the whole list. The
+scrollbar stylesheet draws a slim bar that stays in sight whenever a box with the `scrollbar` class overflows, in
+Chrome, Edge and Safari. Firefox gets a thin bar in the same colours and keeps the system's choice of when to show it.
+Import it once, from the page's script or the app's CSS:
+
+```js
+import '@ismailnakkar/ui-behaviours/scrollbar.css';
+```
+
+```css
+@import '@ismailnakkar/ui-behaviours/scrollbar.css' layer(components);
+```
+
+Then give the scrolling box the class:
+
+```html
+<div class="scrollbar" style="max-height: 32rem; overflow-y: auto">…</div>
+```
+
+A Sass stylesheet can load it as a module and extend the class onto its own selectors instead of adding it to markup:
+
+```scss
+@use '@ismailnakkar/ui-behaviours/scrollbar.css';
+
+.sidebar {
+    overflow-y: auto;
+    @extend .scrollbar;
+}
+```
+
+Three custom properties theme it, set on `:root` for every bar or on a box for its own:
+
+| Property | Default | Is |
+|---|---|---|
+| `--scrollbar-size` | `0.5rem` | the bar's width, or height along the bottom, and its thumb's corner radius |
+| `--scrollbar-thumb-color` | `#b4bac9` | the part that moves |
+| `--scrollbar-track-color` | `transparent` | the groove behind it, and the corner where two bars meet |
+
+Set no `scrollbar-width` or `scrollbar-color` of your own on the box: Chrome 121+ draws its plain bar once either is
+set, and ignores the stylesheet's.
+
 ## Range picker
 
 A date range for a GET form: a button opens a native popover with the app's preset ranges beside a Cally
@@ -600,6 +644,7 @@ stylesheet does.
 | `post(url, body)` | `fetch()`es a `FormData` or `URLSearchParams` body to `url` as a POST that Laravel answers as an AJAX request; resolves to the `Response` |
 | `installRangePicker()`, from `@ismailnakkar/ui-behaviours/range-picker` | listens on the document for range pickers and writes those already on the page; later calls do nothing |
 | `@ismailnakkar/ui-behaviours/range-picker.css` | the range picker's [stylesheet](#styling-the-picker) |
+| `@ismailnakkar/ui-behaviours/scrollbar.css` | the `scrollbar` class's [stylesheet](#scrollbars) |
 
 `copyText()` serves a page's own script, copying a link it just made:
 
@@ -665,6 +710,11 @@ test one opening on load, put its markup in place before installing, in a test f
 Run this package's suite with `npm test`: oxlint, then Vitest.
 
 ## Upgrading
+
+### From 0.7
+
+Nothing changes for a page on 0.7. The new [scrollbar stylesheet](#scrollbars) is opt-in: a page that never imports it
+looks the same.
 
 ### From 0.7.0
 

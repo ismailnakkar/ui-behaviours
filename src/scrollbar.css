@@ -1,0 +1,38 @@
+/*
+ * A styled scrollbar (README, "Scrollbars"): on any box with the `scrollbar` class, a slim bar that stays drawn while
+ * the box overflows, where macOS would otherwise show one only during a scroll. Every app value is a custom property;
+ * the defaults sit in :where(:root), so any rule of the app's wins, and a box may set its own.
+ *
+ * Chromium and Safari draw the ::-webkit-scrollbar parts. Firefox gets the standard pair, and only there: Chrome 121+
+ * reads scrollbar-width and scrollbar-color too, and once either is set it ignores every ::-webkit-scrollbar rule.
+ */
+:where(:root) {
+    --scrollbar-size: 0.5rem;
+    --scrollbar-thumb-color: #b4bac9;
+    --scrollbar-track-color: transparent;
+}
+
+.scrollbar::-webkit-scrollbar {
+    width: var(--scrollbar-size);
+    height: var(--scrollbar-size);
+}
+
+.scrollbar::-webkit-scrollbar-track {
+    background: var(--scrollbar-track-color);
+}
+
+.scrollbar::-webkit-scrollbar-thumb {
+    border-radius: var(--scrollbar-size);
+    background: var(--scrollbar-thumb-color);
+}
+
+.scrollbar::-webkit-scrollbar-corner {
+    background: var(--scrollbar-track-color);
+}
+
+@supports not selector(::-webkit-scrollbar) {
+    .scrollbar {
+        scrollbar-width: thin;
+        scrollbar-color: var(--scrollbar-thumb-color) var(--scrollbar-track-color);
+    }
+}
